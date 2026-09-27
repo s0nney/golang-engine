@@ -1,0 +1,2 @@
+title: Strings, Bytes and Runes
+description: Look inside Go strings to see bytes, runes and UTF-8, then slice, search, build and convert text with the strings and strconv packages.

@@ -1,0 +1,2 @@
+title: Learn HTTP Servers in Go
+description: Build Squeak, a small microblogging JSON API, one piece at a time using nothing but the standard library. Routing, middleware, JSON, storage, authentication, testing and graceful shutdown, all the way to production.

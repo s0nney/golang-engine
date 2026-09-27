@@ -1,0 +1,2 @@
+title: Routing
+description: Teach Squeak's ServeMux to route by method and path, pull IDs out of URLs with wildcards, and understand exactly which pattern wins when several match.

@@ -1,0 +1,2 @@
+title: Headers and Status Codes
+description: Read and write headers, authenticate with tokens and API keys, and turn non-2xx responses into typed errors your code can inspect.

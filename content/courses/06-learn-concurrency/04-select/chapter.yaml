@@ -1,0 +1,2 @@
+title: Select and Time
+description: Wait on multiple channels, handle timeouts and periodic work, coordinate cancellation, and reset timers safely.

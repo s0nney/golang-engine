@@ -1,0 +1,2 @@
+title: Learn Testing and Tooling in Go
+description: Go deep on Go's testing package and toolchain while building Ledgerly, a small accounting library. Table tests, test doubles, golden files, benchmarks, fuzzing, examples, coverage, profiling and the tools that keep a codebase healthy.

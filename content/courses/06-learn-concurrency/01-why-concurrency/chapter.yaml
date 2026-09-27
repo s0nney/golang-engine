@@ -1,0 +1,2 @@
+title: Why Concurrency?
+description: What concurrency is, how it differs from parallelism, how the Go scheduler runs your goroutines, and when adding goroutines actually makes a program faster.

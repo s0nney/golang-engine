@@ -1,0 +1,2 @@
+title: Learn HTTP Clients in Go
+description: Build Trackr, a command-line client for an issue-tracking API, with net/http. Learn URLs, JSON (including the new encoding/json/v2), methods, headers, timeouts, retries, pagination, TLS and how to test it all without touching the network.

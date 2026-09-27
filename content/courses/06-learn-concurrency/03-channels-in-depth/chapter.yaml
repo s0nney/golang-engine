@@ -1,0 +1,2 @@
+title: Channels in Depth
+description: Everything channels can do and every way they can bite - buffering, direction, closing, ranging and the surprisingly useful nil channel.

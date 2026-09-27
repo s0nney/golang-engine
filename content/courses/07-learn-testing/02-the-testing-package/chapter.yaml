@@ -1,0 +1,2 @@
+title: The testing Package
+description: Everything *testing.T can do for you, from failing well and writing helpers to temp dirs, contexts, environment variables, artifacts and parallel tests.

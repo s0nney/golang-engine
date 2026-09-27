@@ -1,0 +1,2 @@
+title: 'Learn Functional Programming in Go'
+description: 'Treat functions as values, keep your data immutable and build lazy pipelines with iterators, all while building Doc2Doc, a tool that converts, formats and analyses text documents. Along the way you''ll learn where Go makes functional programming easy and where it pushes back.'

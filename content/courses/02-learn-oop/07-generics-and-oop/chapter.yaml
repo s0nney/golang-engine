@@ -1,0 +1,2 @@
+title: Generics and OOP
+description: Generic types, constraints, Go 1.27's brand-new generic methods and self-referential constraints, and how they fit alongside interfaces.

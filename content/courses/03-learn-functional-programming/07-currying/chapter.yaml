@@ -1,0 +1,2 @@
+title: 'Currying'
+description: 'Turn a function of many arguments into a chain of one-argument functions, and learn when partial application actually helps in Go.'

@@ -1,0 +1,2 @@
+title: Hashmaps
+description: Build a hashmap from scratch, handle collisions and resizing, then look under the hood of Go's own Swiss-table map.

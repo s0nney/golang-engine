@@ -1,0 +1,2 @@
+title: Graphs
+description: Model the game world as zones connected by paths, and learn the two classic ways to store a graph in memory.

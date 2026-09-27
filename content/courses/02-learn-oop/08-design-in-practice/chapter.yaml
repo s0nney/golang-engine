@@ -1,0 +1,2 @@
+title: Design in Practice
+description: Put it all together. Accept interfaces and return structs, inject dependencies, use functional options, check interfaces at compile time, and know when to skip OOP entirely.

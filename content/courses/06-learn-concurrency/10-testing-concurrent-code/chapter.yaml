@@ -1,0 +1,2 @@
+title: Testing Concurrent Code
+description: Make concurrent tests fast and deterministic with testing/synctest and its fake clock, hunt down leaked goroutines, then assemble and test Dispatchly's dispatch engine.

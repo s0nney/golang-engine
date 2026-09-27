@@ -1,0 +1,2 @@
+title: Production Readiness
+description: Shut down gracefully, log in structured form with log/slog, configure Squeak from the environment, add health checks, and see where a real database and deployment fit.

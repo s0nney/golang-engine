@@ -1,0 +1,2 @@
+title: Test Doubles
+description: Design Ledgerly so it can be tested, then swap real dependencies for hand-written fakes, stubs, spies and mocks, including the trickiest dependency of all, the clock.

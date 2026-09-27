@@ -1,0 +1,2 @@
+title: Synchronization Primitives
+description: Protect shared state with locks, once functions, atomics and condition variables, and learn when sync.Map and sync.Pool are (and aren't) the right tools.

@@ -1,0 +1,2 @@
+title: Benchmarks
+description: Measure how fast Ledgerly is and how much it allocates with b.Loop, compare results without fooling yourself, and learn the classic benchmarking traps.

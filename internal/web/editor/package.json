@@ -1,0 +1,20 @@
+{
+  "name": "goland-engine-editor",
+  "private": true,
+  "description": "Code editor for exercises: CodeMirror 6 with an optional vim mode. Bundled into ../static/editor.js.",
+  "scripts": {
+    "build": "esbuild editor.js --bundle --minify --format=iife --target=es2020 --legal-comments=eof --banner:js='/*! Bundles CodeMirror 6 and @replit/codemirror-vim (MIT). Licenses: /static/editor-licenses.txt */' --outfile=../static/editor.js && node licenses.mjs > ../static/editor-licenses.txt"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6",
+    "@codemirror/language": "^6",
+    "@codemirror/legacy-modes": "^6",
+    "@codemirror/state": "^6",
+    "@codemirror/view": "^6",
+    "@lezer/highlight": "^1",
+    "@replit/codemirror-vim": "^6.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3"
+  }
+}

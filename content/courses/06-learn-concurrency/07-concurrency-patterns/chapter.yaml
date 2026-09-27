@@ -1,0 +1,2 @@
+title: Concurrency Patterns
+description: The shapes that come up again and again - generators, pipelines, fan-out and fan-in, worker pools and semaphores.

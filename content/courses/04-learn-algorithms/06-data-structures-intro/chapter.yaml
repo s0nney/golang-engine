@@ -1,0 +1,2 @@
+title: Data Structures Intro
+description: "What data structures are, how arrays and slices sit in memory, and why append is fast on average."

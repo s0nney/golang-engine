@@ -1,0 +1,2 @@
+title: 'First-Class Functions'
+description: 'Functions are values in Go. Store them, pass them around and write generic Map, Filter and Reduce helpers.'

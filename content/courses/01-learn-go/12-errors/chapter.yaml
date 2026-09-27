@@ -1,0 +1,2 @@
+title: Errors
+description: Handle failure the Go way, with errors as values you return, wrap, inspect and handle.

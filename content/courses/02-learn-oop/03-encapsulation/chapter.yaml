@@ -1,0 +1,2 @@
+title: Encapsulation
+description: Hide the internals of a type so nobody can break it. In Go the unit of privacy is the package, and capitalisation is the access modifier.

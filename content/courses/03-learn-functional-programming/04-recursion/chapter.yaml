@@ -1,0 +1,2 @@
+title: 'Recursion'
+description: 'Functions that call themselves: base cases, the call stack, walking trees of documents, and why Go programmers often reach for a loop instead.'

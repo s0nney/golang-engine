@@ -1,0 +1,2 @@
+title: HTTP Methods
+description: GET, POST, PUT, PATCH and DELETE, which ones are safe to repeat, and how to build any request you like with http.NewRequestWithContext.

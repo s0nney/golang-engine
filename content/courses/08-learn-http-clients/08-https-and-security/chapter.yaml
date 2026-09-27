@@ -1,0 +1,2 @@
+title: HTTPS and Security
+description: What TLS actually protects, how certificates prove who you're talking to, why InsecureSkipVerify is a trap, and how to keep tokens out of your logs.

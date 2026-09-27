@@ -1,0 +1,2 @@
+title: 'Pure Functions'
+description: 'Functions without side effects are easier to reason about and test. Learn how to keep data immutable in a language where slices and maps share memory.'

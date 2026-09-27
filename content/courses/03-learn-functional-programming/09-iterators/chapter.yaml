@@ -1,0 +1,2 @@
+title: 'Iterators'
+description: 'Range over functions with iter.Seq and iter.Seq2, build lazy pipelines, and use the iterators in the standard library.'

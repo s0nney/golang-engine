@@ -1,0 +1,2 @@
+title: JSON
+description: Speak the language of web APIs. Encode and decode Trackr issues with struct tags, then meet encoding/json/v2, the stricter and faster JSON package that ships with Go 1.27.

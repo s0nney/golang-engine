@@ -1,0 +1,2 @@
+title: HTTP Clients in Practice
+description: Configure a real http.Client with timeouts, reuse connections properly, retry flaky requests with backoff and jitter, respect Retry-After and stay under rate limits.

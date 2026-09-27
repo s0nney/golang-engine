@@ -1,0 +1,2 @@
+title: Coverage and Tooling
+description: Measure test coverage, catch bugs with go vet, keep code modern with gofmt and go fix, and find hot spots with pprof.

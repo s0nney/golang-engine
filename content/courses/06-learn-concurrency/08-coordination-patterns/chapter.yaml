@@ -1,0 +1,2 @@
+title: Errors and Coordination
+description: Build an error group where the first failure cancels the rest, choose how a pipeline reports errors, line goroutines up at a barrier, and publish events to many subscribers.

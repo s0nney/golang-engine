@@ -1,0 +1,2 @@
+title: 'Decorators and Middleware'
+description: 'Go has no decorator syntax, but wrapping one function in another gives you logging, timing and net/http middleware.'

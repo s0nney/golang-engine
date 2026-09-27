@@ -1,0 +1,2 @@
+title: Heaps and Priority Queues
+description: Store a tree inside a slice, keep the best item on top, and use container/heap to answer "who are the top k players?" fast.

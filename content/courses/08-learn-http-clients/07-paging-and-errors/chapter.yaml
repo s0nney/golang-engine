@@ -1,0 +1,2 @@
+title: Paging and Errors
+description: Walk through thousands of issues one page at a time with offsets, cursors and Link headers, wrap it all in an iter.Seq2, and decide what to do when page 7 of 10 fails.

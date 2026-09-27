@@ -1,0 +1,2 @@
+title: Why HTTP?
+description: Meet clients, servers and the request/response loop behind almost every API, then make your first GET request from Go and learn why you must always close the body.

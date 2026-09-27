@@ -1,0 +1,2 @@
+title: Handlers and Middleware
+description: Look under the hood of http.Handler, then wrap Squeak's handlers in reusable layers for logging, request IDs, panic recovery and metrics.

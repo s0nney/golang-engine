@@ -1,0 +1,2 @@
+title: Testing HTTP Clients
+description: Test Trackr without the internet. Spin up fake APIs with httptest, inject base URLs and clients, simulate failures and slow servers, and test retries and timeouts deterministically with synctest.

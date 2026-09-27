@@ -1,0 +1,2 @@
+title: Examples and Docs
+description: Example functions that are documentation and tests at the same time, reading docs with go doc, and writing doc comments that render well everywhere.

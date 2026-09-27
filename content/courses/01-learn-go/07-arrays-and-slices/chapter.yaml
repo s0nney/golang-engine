@@ -1,0 +1,2 @@
+title: Arrays and Slices
+description: Store ordered lists of values, grow them with append, and avoid the classic slice aliasing traps.

@@ -1,0 +1,2 @@
+title: Authorization and Webhooks
+description: Decide what a logged-in user is allowed to do, protect owner-only actions, and accept webhooks from another service with API keys and idempotency.

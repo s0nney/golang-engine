@@ -1,0 +1,448 @@
+package views
+
+import (
+	"fmt"
+
+	"goland-engine/internal/course"
+	"goland-engine/internal/store"
+)
+
+// Link points at a lesson.
+type Link struct {
+	URL   string
+	Title string
+}
+
+// CourseCard is a course on the roadmap with the learner's progress.
+type CourseCard struct {
+	store.CourseSummary
+	Done int
+}
+
+// Outline is a course page with the learner's progress.
+type Outline struct {
+	Course   course.Course
+	Done     map[store.LessonKey]bool
+	Continue *Link // first unfinished lesson; nil when the course is finished
+}
+
+// Lesson is everything the lesson page renders.
+type Lesson struct {
+	Course       course.Course // outline only
+	ChapterTitle string
+	Lesson       course.Lesson
+	URL          string
+	Number       int // 1-based position within the course
+	Total        int
+	Prev, Next   *Link
+	Complete     bool
+	Quiz         *QuizResult // nil until the quiz is submitted
+	Code         string      // editor contents
+	Output       *RunResult  // nil until code is run
+}
+
+// QuizResult is a graded quiz submission.
+type QuizResult struct {
+	Chosen  []int // chosen option per question, -1 if unanswered
+	Correct []bool
+	Passed  bool
+}
+
+// RunResult is the outcome of pressing Run or Submit.
+type RunResult struct {
+	Submit   bool // graded submission rather than a test run
+	Passed   bool
+	Output   string
+	Expected string // set when a submission's output didn't match
+	Next     *Link
+	Complete bool // the lesson just became complete
+}
+
+templ layout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/static/style.css"/>
+			<script src="/static/htmx.min.js" defer></script>
+			<script src="/static/activity.js" defer></script>
+		</head>
+		<body>
+			<header>
+				<a href="/" class="brand">goland-engine</a>
+				<nav><a href="/#courses">courses</a></nav>
+			</header>
+			{ children... }
+			<footer>
+				<p>goland-engine. Learn to program, in Go.</p>
+			</footer>
+		</body>
+	</html>
+}
+
+templ Home(courses []CourseCard, activity store.Activity) {
+	@layout("goland-engine: learn to program in Go") {
+		<main class="narrow">
+			<h1>Learn to program. In Go.</h1>
+			<p>
+				Short lessons, one idea at a time, each with a quiz or a coding exercise to check you
+				actually got it. Start at course 1 knowing nothing and finish able to build and test
+				concurrent web services in Go, with object-oriented and functional design and the data
+				structures and algorithms interviews are made of along the way.
+			</p>
+			<p>No account. No videos. Your progress is saved in this browser.</p>
+			@Activity(activity)
+			<h2 id="courses">The roadmap</h2>
+			<ol class="roadmap">
+				for _, c := range courses {
+					<li>
+						<a href={ templ.SafeURL("/courses/" + c.Slug) }><strong>{ c.Title }</strong></a>
+						<p>{ c.Description }</p>
+						<small>
+							{ fmt.Sprintf("%d chapters · %d lessons", c.Chapters, c.Lessons) }
+							if c.Done > 0 {
+								· <span class="done">{ fmt.Sprintf("%d done", c.Done) }</span>
+							}
+						</small>
+						if c.Done > 0 {
+							<progress max={ fmt.Sprint(c.Lessons) } value={ fmt.Sprint(c.Done) }></progress>
+						}
+					</li>
+				}
+			</ol>
+			<form method="post" action="/progress/reset" class="reset">
+				<button type="submit" class="quiet" onclick="return confirm('Forget all progress, activity, and streaks in this browser?')">Reset my progress</button>
+			</form>
+		</main>
+	}
+}
+
+templ Course(v Outline) {
+	@layout(v.Course.Title + " · goland-engine") {
+		<main class="narrow">
+			<p class="crumbs"><a href="/">Roadmap</a></p>
+			<h1>{ v.Course.Title }</h1>
+			<p>{ v.Course.Description }</p>
+			if v.Continue != nil {
+				<p>
+					<a class="button" href={ templ.SafeURL(v.Continue.URL) }>
+						if len(v.Done) == 0 {
+							Start course →
+						} else {
+							Continue: { v.Continue.Title } →
+						}
+					</a>
+				</p>
+			} else {
+				<p class="done">You've finished this course.</p>
+			}
+			<ol class="chapters">
+				for _, ch := range v.Course.Chapters {
+					<li>
+						<h2>{ ch.Title }</h2>
+						if ch.Description != "" {
+							<p>{ ch.Description }</p>
+						}
+						<ol>
+							for _, l := range ch.Lessons {
+								<li>
+									<a href={ templ.SafeURL(LessonURL(v.Course.Slug, ch.Slug, l.Slug)) }>{ l.Title }</a>
+									if v.Done[store.LessonKey{Course: v.Course.Slug, Chapter: ch.Slug, Lesson: l.Slug}] {
+										<span class="done" title="Completed">✓</span>
+									}
+								</li>
+							}
+						</ol>
+					</li>
+				}
+			</ol>
+		</main>
+	}
+}
+
+templ LessonPage(v Lesson) {
+	@layout(v.Lesson.Title + " · " + v.Course.Title) {
+		<main class="lesson">
+			<article>
+				<p class="crumbs">
+					<a href={ templ.SafeURL("/courses/" + v.Course.Slug) }>{ v.Course.Title }</a>
+					/ { v.ChapterTitle }
+					<span class="count">
+						@status(v.Complete)
+						{ fmt.Sprintf("%d / %d", v.Number, v.Total) }
+					</span>
+				</p>
+				<h1>{ v.Lesson.Title }</h1>
+				@templ.Raw(v.Lesson.HTML)
+			</article>
+			<aside class="panels">
+				if v.Lesson.Exercise != nil {
+					@exercise(v)
+				}
+				if len(v.Lesson.Quiz) > 0 {
+					@quiz(v)
+				}
+			</aside>
+			if v.Lesson.Exercise != nil {
+				<script src="/static/editor.js" defer></script>
+			}
+			<nav class="pager">
+				if v.Prev != nil {
+					<a href={ templ.SafeURL(v.Prev.URL) } rel="prev">← { v.Prev.Title }</a>
+				} else {
+					<span></span>
+				}
+				if v.Next != nil {
+					<a href={ templ.SafeURL(v.Next.URL) } rel="next">{ v.Next.Title } →</a>
+				} else {
+					<a href={ templ.SafeURL("/courses/" + v.Course.Slug) }>Back to course →</a>
+				}
+			</nav>
+		</main>
+	}
+}
+
+templ status(complete bool) {
+	<span id="lesson-status">
+		if complete {
+			<span class="done">✓ Completed</span> ·
+		}
+	</span>
+}
+
+// exercise is the code editor. With htmx, Run and Submit swap only the
+// output; without it, the form posts and the whole page re-renders.
+templ exercise(v Lesson) {
+	<section class="panel" id="exercise">
+		<h2>Exercise</h2>
+		<form method="post" action={ templ.SafeURL(v.URL + "#exercise") }>
+			<label for="code" class="sr-only">Your code</label>
+			<textarea
+				id="code"
+				name="code"
+				data-editor
+				rows="18"
+				spellcheck="false"
+				autocapitalize="off"
+				autocomplete="off"
+				hx-on:keydown="if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) { event.preventDefault(); this.setRangeText('\t', this.selectionStart, this.selectionEnd, 'end') } else if (event.key === 'Escape') { this.blur() }"
+			>{ v.Code }</textarea>
+			<div class="editor-bar">
+				<p class="hint">Tab indents. Press Esc, then Tab, to leave the editor.</p>
+				<label class="vim-toggle" hidden><input type="checkbox"/> Vim mode</label>
+			</div>
+			<div class="actions">
+				<button type="submit" name="action" value="run" class="secondary" hx-post={ v.URL } hx-target="#output" hx-indicator="#running" hx-disabled-elt="#exercise button">Run</button>
+				<button type="submit" name="action" value="submit" hx-post={ v.URL } hx-target="#output" hx-indicator="#running" hx-disabled-elt="#exercise button">Submit</button>
+				<span id="running" class="htmx-indicator">Running…</span>
+				<button type="submit" name="action" value="reset" class="quiet" formnovalidate hx-post={ v.URL } hx-target="#exercise" hx-swap="outerHTML" hx-confirm="Replace your code with the starter code?">Reset code</button>
+			</div>
+		</form>
+		<div id="output" aria-live="polite">
+			if v.Output != nil {
+				@Output(*v.Output)
+			}
+		</div>
+	</section>
+}
+
+// Exercise renders just the exercise panel, for htmx swaps.
+templ Exercise(v Lesson) {
+	@exercise(v)
+}
+
+// Output renders the result of Run or Submit.
+templ Output(r RunResult) {
+	if !r.Submit {
+		<p class="verdict-line">Output <small>(test run, not graded)</small></p>
+	} else if r.Passed {
+		<p class="verdict-line right">Passed.</p>
+	} else {
+		<p class="verdict-line wrong">Not quite. Check the output and try again.</p>
+	}
+	if r.Expected != "" {
+		<div class="compare">
+			<div>
+				<h3>Expected</h3>
+				<pre>{ r.Expected }</pre>
+			</div>
+			<div>
+				<h3>Your output</h3>
+				<pre>{ r.Output }</pre>
+			</div>
+		</div>
+	} else {
+		<pre class="output">
+			if r.Output == "" {
+				<em>(no output)</em>
+			} else {
+				{ r.Output }
+			}
+		</pre>
+	}
+	if r.Submit && r.Passed {
+		<p class="passed">
+			if r.Next != nil {
+				<a class="button" href={ templ.SafeURL(r.Next.URL) }>Next lesson →</a>
+			} else {
+				<span>You finished the course!</span>
+				<a class="button" href="/">Back to the roadmap →</a>
+			}
+		</p>
+	}
+	if r.Complete {
+		<span id="lesson-status" hx-swap-oob="true"><span class="done">✓ Completed</span> · </span>
+	}
+}
+
+templ quiz(v Lesson) {
+	<section class="panel" id="quiz">
+		<h2>Quiz</h2>
+		<form method="post" action={ templ.SafeURL(v.URL + "#quiz") }>
+			for i, q := range v.Lesson.Quiz {
+				<fieldset class={ questionClass(v.Quiz, i) }>
+					<legend class="sr-only">{ fmt.Sprintf("Question %d", i+1) }</legend>
+					@templ.Raw(q.Prompt)
+					for j, o := range q.Options {
+						<label>
+							<input
+								type="radio"
+								name={ fmt.Sprintf("q%d", i) }
+								value={ fmt.Sprint(j) }
+								checked?={ v.Quiz != nil && v.Quiz.Chosen[i] == j }
+								required
+							/>
+							<span>
+								@templ.Raw(o.Text)
+							</span>
+						</label>
+					}
+					if v.Quiz != nil {
+						if v.Quiz.Correct[i] {
+							<p class="verdict">Correct.</p>
+						} else {
+							<p class="verdict">Not quite. Try again.</p>
+						}
+						<details open?={ v.Quiz.Correct[i] }>
+							<summary>Explanation</summary>
+							@templ.Raw(q.Explanation)
+						</details>
+					}
+				</fieldset>
+			}
+			<button type="submit" name="action" value="quiz">Check answers</button>
+		</form>
+		if v.Quiz != nil && v.Quiz.Passed {
+			<p class="passed">
+				All correct.
+				if v.Complete && v.Next != nil {
+					<a class="button" href={ templ.SafeURL(v.Next.URL) }>Next lesson →</a>
+				} else if v.Complete {
+					<span>You finished the course!</span>
+					<a class="button" href="/">Back to the roadmap →</a>
+				} else {
+					<span>Now finish the exercise.</span>
+				}
+			</p>
+		}
+	</section>
+}
+
+templ NotFound() {
+	@layout("Not found · goland-engine") {
+		<main class="narrow">
+			<h1>404</h1>
+			<p>That page doesn't exist. <a href="/">Back to the roadmap</a>.</p>
+		</main>
+	}
+}
+
+func questionClass(r *QuizResult, i int) string {
+	switch {
+	case r == nil:
+		return ""
+	case r.Correct[i]:
+		return "right"
+	default:
+		return "wrong"
+	}
+}
+
+// LessonURL builds the canonical URL of a lesson.
+func LessonURL(courseSlug, chapterSlug, lessonSlug string) string {
+	return "/courses/" + courseSlug + "/" + chapterSlug + "/" + lessonSlug
+}
+
+// Activity is a calendar of passed quizzes and exercises, grouped into weeks.
+templ Activity(a store.Activity) {
+	<section class="activity" aria-labelledby="activity-heading" data-activity>
+		<div class="activity-heading">
+			<h2 id="activity-heading">Your learning activity</h2>
+			<span class="activity-period">Last 26 weeks</span>
+		</div>
+		<dl class="streak-stats">
+			<div><dt>Current streak</dt><dd>{ fmt.Sprint(a.CurrentStreak) }<span>{ " " + plural(a.CurrentStreak, "day", "days") }</span></dd></div>
+			<div><dt>Best streak</dt><dd>{ fmt.Sprint(a.BestStreak) }<span>{ " " + plural(a.BestStreak, "day", "days") }</span></dd></div>
+			<div><dt>Today</dt><dd>{ fmt.Sprint(a.Today) }<span>{ " completed" }</span></dd></div>
+		</dl>
+		<div class="heatmap-scroll" tabindex="0" role="region" aria-label="Daily learning activity, Sunday through Saturday in each column">
+			<div class="heatmap-layout">
+				<div class="heatmap-weekdays" aria-hidden="true"><span>Sun</span><span></span><span>Tue</span><span></span><span>Thu</span><span></span><span>Sat</span></div>
+				<div class="heatmap" role="list" aria-label="Daily completions">
+					for _, day := range a.Days {
+						if day.Future {
+							<span class="heatmap-day future" aria-hidden="true"></span>
+						} else {
+							<span class={ heatmapClass(day.Count) } role="listitem" aria-label={ activityLabel(day) } data-date={ day.Date } data-count={ fmt.Sprint(day.Count) }>
+								<span class="heatmap-tooltip" aria-hidden="true">{ activityLabel(day) }</span>
+							</span>
+						}
+					}
+				</div>
+			</div>
+		</div>
+		<div class="activity-footer">
+			<small>{ fmt.Sprintf("%d %s · %d active %s", a.Total, plural(a.Total, "completion", "completions"), a.ActiveDays, plural(a.ActiveDays, "day", "days")) }</small>
+			<div class="heatmap-legend" role="group" aria-label="Daily completions: 0, 1–2, 3–5, 6–9, 10 or more">
+				for level, label := range []string{"0", "1–2", "3–5", "6–9", "10+"} {
+					<span><i class={ fmt.Sprintf("heatmap-day level-%d", level) } aria-hidden="true"></i>{ label }</span>
+				}
+			</div>
+		</div>
+		<p class="hint">Pass a lesson quiz or coding exercise to count toward your streak. Each counts once per day, including reviews.</p>
+		if a.Today == 0 && a.CurrentStreak > 0 {
+			<p class="activity-nudge">Keep it going—complete a quiz or exercise today.</p>
+		} else if a.BestStreak == 0 {
+			<p class="activity-nudge">Your first completion starts your streak.</p>
+		}
+		<p class="hint">Days use { a.Timezone }. Saved for this browser; clearing its cookies starts fresh.</p>
+	</section>
+}
+
+func heatmapClass(count int) string {
+	level := 0
+	switch {
+	case count >= 10:
+		level = 4
+	case count >= 6:
+		level = 3
+	case count >= 3:
+		level = 2
+	case count >= 1:
+		level = 1
+	}
+	return fmt.Sprintf("heatmap-day level-%d", level)
+}
+
+func activityLabel(day store.ActivityDay) string {
+	return fmt.Sprintf("%s: %d %s", day.Date, day.Count, plural(day.Count, "completed quiz or exercise", "completed quizzes and exercises"))
+}
+
+func plural(count int, singular, multiple string) string {
+	if count == 1 {
+		return singular
+	}
+	return multiple
+}

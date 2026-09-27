@@ -1,0 +1,2 @@
+title: 'Function Transformations'
+description: 'Functions that take and return functions, composing small steps into bigger ones, and a generic Compose helper.'

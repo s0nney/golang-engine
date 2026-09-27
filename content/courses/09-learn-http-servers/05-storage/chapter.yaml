@@ -1,0 +1,2 @@
+title: Storage
+description: Put Squeak's data behind a repository interface, build an in-memory store that's safe for concurrent requests, and give every record a sortable UUID and a timestamp.

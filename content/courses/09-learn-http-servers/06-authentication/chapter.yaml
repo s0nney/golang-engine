@@ -1,0 +1,2 @@
+title: Authentication
+description: Hash passwords, log mice in, and prove who's calling with HMAC-signed access tokens, Authorization headers, auth middleware and refresh tokens.

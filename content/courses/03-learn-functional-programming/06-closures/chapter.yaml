@@ -1,0 +1,2 @@
+title: 'Closures'
+description: 'Functions that remember the variables around them. Build counters and accumulators, and learn the gotchas, including how Go 1.22 changed loop variables.'

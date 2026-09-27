@@ -1,0 +1,2 @@
+title: Testing I/O and Files
+description: Test code that reads and writes by talking to io.Reader, io.Writer and fs.FS, and keep large expected outputs in golden files under testdata.

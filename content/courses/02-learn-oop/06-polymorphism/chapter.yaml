@@ -1,0 +1,2 @@
+title: Polymorphism
+description: One piece of code, many types. Implicit interfaces, dynamic dispatch, type assertions, type switches and the famous nil-interface gotcha.

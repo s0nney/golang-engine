@@ -1,0 +1,2 @@
+title: Race Conditions and Deadlocks
+description: The two classic ways concurrent programs go wrong - goroutines interfering with each other, and goroutines waiting on each other forever - and the tools and habits that catch them, from the race detector to runtime metrics.

@@ -1,0 +1,2 @@
+title: Table-Driven Tests
+description: Tables and subtests done properly, picking out cases with -run, comparing structured results, and testing the error paths as carefully as the happy ones.

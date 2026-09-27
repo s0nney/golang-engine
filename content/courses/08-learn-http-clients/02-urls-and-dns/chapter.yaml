@@ -1,0 +1,2 @@
+title: URLs and DNS
+description: Take URLs apart and put them back together safely with net/url, including query strings, path joining and the new URL.Clone, then follow a hostname through DNS to a port.

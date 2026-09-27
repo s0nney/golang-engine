@@ -1,0 +1,2 @@
+title: Abstraction
+description: Hide complexity behind simple behaviour contracts. Interfaces are Go's main abstraction tool, and the smaller they are the better they work.

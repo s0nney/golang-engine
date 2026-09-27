@@ -1,0 +1,2 @@
+title: Types and Methods
+description: Go has no classes, but structs plus methods get you most of the way to objects. Learn constructors, receivers, method sets and useful zero values.

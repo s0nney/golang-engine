@@ -1,0 +1,2 @@
+title: Big O Analysis
+description: "Describe how an algorithm's cost grows with its input, from O(1) to O(n^2), and measure it with Go benchmarks."

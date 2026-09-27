@@ -1,0 +1,2 @@
+title: Inheritance vs Composition
+description: Go deliberately leaves out inheritance. Learn struct embedding, promoted methods, and why embedding looks like subclassing but isn't.

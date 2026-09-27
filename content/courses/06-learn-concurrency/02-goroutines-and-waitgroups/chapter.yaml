@@ -1,0 +1,2 @@
+title: Goroutines and WaitGroups
+description: A quick recap of goroutines, then the details that matter in real code - waiting correctly, capturing variables safely, and making sure no goroutine is left behind.

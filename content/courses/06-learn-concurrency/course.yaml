@@ -1,0 +1,2 @@
+title: Learn Concurrency in Go
+description: Go deep on goroutines, channels, select, context and the sync package, then put them together into real concurrency patterns, hunt down races and leaks, and test it all deterministically. You'll build the dispatch engine behind Dispatchly, a food-delivery platform.

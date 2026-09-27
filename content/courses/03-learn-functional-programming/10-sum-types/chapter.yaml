@@ -1,0 +1,2 @@
+title: 'Sum Types'
+description: 'Model a value that is exactly one of several shapes, emulate sum types with sealed interfaces, and build generic Option and Result types.'
