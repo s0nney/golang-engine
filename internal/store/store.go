@@ -26,11 +26,14 @@ type CourseSummary struct {
 	Slug        string
 	Title       string
 	Description string
+	Beyond      bool // listed after the core roadmap
 	Chapters    int
 	Lessons     int
 }
 
 const schema = `
+DROP TABLE IF EXISTS hints;
+DROP TABLE IF EXISTS problems;
 DROP TABLE IF EXISTS exercises;
 DROP TABLE IF EXISTS options;
 DROP TABLE IF EXISTS questions;
@@ -43,6 +46,7 @@ CREATE TABLE courses (
 	slug        TEXT NOT NULL UNIQUE,
 	title       TEXT NOT NULL,
 	description TEXT NOT NULL,
+	beyond      INTEGER NOT NULL DEFAULT 0,
 	position    INTEGER NOT NULL
 );
 CREATE TABLE chapters (
@@ -76,6 +80,25 @@ CREATE TABLE exercises (
 	tests           TEXT NOT NULL,
 	expected_output TEXT NOT NULL
 );
+CREATE TABLE problems (
+	id              INTEGER PRIMARY KEY,
+	course_id       INTEGER NOT NULL REFERENCES courses(id),
+	slug            TEXT NOT NULL,
+	title           TEXT NOT NULL,
+	html            TEXT NOT NULL,
+	difficulty      TEXT NOT NULL,
+	after_chapter   TEXT NOT NULL,
+	position        INTEGER NOT NULL,
+	starter         TEXT NOT NULL,
+	tests           TEXT NOT NULL,
+	expected_output TEXT NOT NULL,
+	UNIQUE (course_id, slug)
+);
+CREATE TABLE hints (
+	problem_id INTEGER NOT NULL REFERENCES problems(id),
+	html       TEXT NOT NULL,
+	position   INTEGER NOT NULL
+);
 CREATE TABLE options (
 	id          INTEGER PRIMARY KEY,
 	question_id INTEGER NOT NULL REFERENCES questions(id),
@@ -90,9 +113,13 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := db.Exec(progressSchema + activitySchema); err != nil {
+	if _, err := db.Exec(progressSchema + activitySchema + practiceSchema); err != nil {
 		db.Close()
 		return nil, err
+	}
+	if err := migrateActivity(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrating activity: %w", err)
 	}
 	return &Store{db: db}, nil
 }
@@ -112,10 +139,24 @@ func (s *Store) Seed(ctx context.Context, courses []course.Course) error {
 	}
 	for i, c := range courses {
 		courseID, err := insert(ctx, tx,
-			`INSERT INTO courses (slug, title, description, position) VALUES (?, ?, ?, ?)`,
-			c.Slug, c.Title, c.Description, i)
+			`INSERT INTO courses (slug, title, description, beyond, position) VALUES (?, ?, ?, ?, ?)`,
+			c.Slug, c.Title, c.Description, c.Beyond, i)
 		if err != nil {
 			return fmt.Errorf("course %s: %w", c.Slug, err)
+		}
+		for m, p := range c.Problems {
+			problemID, err := insert(ctx, tx,
+				`INSERT INTO problems (course_id, slug, title, html, difficulty, after_chapter, position, starter, tests, expected_output)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				courseID, p.Slug, p.Title, p.HTML, p.Difficulty, p.After, m, p.Exercise.Starter, p.Exercise.Tests, p.Exercise.ExpectedOutput)
+			if err != nil {
+				return fmt.Errorf("problem %s/%s: %w", c.Slug, p.Slug, err)
+			}
+			for n, h := range p.Hints {
+				if _, err := insert(ctx, tx, `INSERT INTO hints (problem_id, html, position) VALUES (?, ?, ?)`, problemID, h, n); err != nil {
+					return err
+				}
+			}
 		}
 		for j, ch := range c.Chapters {
 			chapterID, err := insert(ctx, tx,
@@ -170,7 +211,7 @@ func insert(ctx context.Context, tx *sql.Tx, query string, args ...any) (int64, 
 // Courses lists every course in roadmap order.
 func (s *Store) Courses(ctx context.Context) ([]CourseSummary, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT c.slug, c.title, c.description,
+		SELECT c.slug, c.title, c.description, c.beyond,
 		       (SELECT count(*) FROM chapters ch WHERE ch.course_id = c.id),
 		       (SELECT count(*) FROM lessons l JOIN chapters ch ON ch.id = l.chapter_id WHERE ch.course_id = c.id)
 		FROM courses c ORDER BY c.position`)
@@ -181,7 +222,7 @@ func (s *Store) Courses(ctx context.Context) ([]CourseSummary, error) {
 	var out []CourseSummary
 	for rows.Next() {
 		var c CourseSummary
-		if err := rows.Scan(&c.Slug, &c.Title, &c.Description, &c.Chapters, &c.Lessons); err != nil {
+		if err := rows.Scan(&c.Slug, &c.Title, &c.Description, &c.Beyond, &c.Chapters, &c.Lessons); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

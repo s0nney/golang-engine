@@ -473,7 +473,7 @@ func (cfg *apiConfig) handleMe(w http.ResponseWriter, r *http.Request) {
 
 The `validateToken` function from the last exercise needs the signing secret and the
 current time. Squeak's `apiConfig` stores the secret (loaded from an environment variable
-in the last chapter) and exposes a method that closes over it. In this exercise it's a
+in the final chapter) and exposes a method that closes over it. In this exercise it's a
 plain function field on `apiConfig`, so tests can plug in a fake validator:
 
 ```go

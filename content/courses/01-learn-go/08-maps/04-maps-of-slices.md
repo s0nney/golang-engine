@@ -37,6 +37,79 @@ quiz:
     explanation: |
       Map keys must be comparable with `==`. Slices, maps and functions
       aren't, so they can't be keys. They're perfectly fine as *values*.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // groupByRecipient returns each recipient's texts, in the order they were sent.
+    // recipients[i] received texts[i].
+    func groupByRecipient(recipients, texts []string) map[string][]string {
+    	groups := make(map[string][]string)
+    	// ?
+    	return groups
+    }
+
+    func main() {
+    	recipients := []string{"alice", "bob", "alice"}
+    	texts := []string{"Your code is 4821", "Hi Bob", "Your order shipped"}
+    	groups := groupByRecipient(recipients, texts)
+    	fmt.Println(len(groups["alice"]), groups["alice"])
+    	fmt.Println(len(groups["bob"]), groups["bob"])
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func groupByRecipient(recipients, texts []string) map[string][]string {
+    	groups := make(map[string][]string)
+    	for i, r := range recipients {
+    		groups[r] = append(groups[r], texts[i])
+    	}
+    	return groups
+    }
+
+    func main() {
+    	recipients := []string{"alice", "bob", "alice"}
+    	texts := []string{"Your code is 4821", "Hi Bob", "Your order shipped"}
+    	groups := groupByRecipient(recipients, texts)
+    	fmt.Println(len(groups["alice"]), groups["alice"])
+    	fmt.Println(len(groups["bob"]), groups["bob"])
+    }
+  tests: |
+    package main
+
+    import (
+    	"maps"
+    	"slices"
+    	"testing"
+    )
+
+    func TestGroupByRecipient(t *testing.T) {
+    	for _, tc := range []struct {
+    		recipients, texts []string
+    		want              map[string][]string
+    	}{
+    		{
+    			[]string{"alice", "bob", "alice"},
+    			[]string{"Your code is 4821", "Hi Bob", "Your order shipped"},
+    			map[string][]string{"alice": {"Your code is 4821", "Your order shipped"}, "bob": {"Hi Bob"}},
+    		},
+    		{
+    			[]string{"carol", "carol", "carol"},
+    			[]string{"1", "2", "3"},
+    			map[string][]string{"carol": {"1", "2", "3"}},
+    		},
+    		{nil, nil, map[string][]string{}},
+    	} {
+    		got := groupByRecipient(tc.recipients, tc.texts)
+    		if got == nil || !maps.EqualFunc(got, tc.want, slices.Equal) {
+    			t.Errorf("groupByRecipient(%q, %q) = %q, want %q", tc.recipients, tc.texts, got, tc.want)
+    		}
+    	}
+    }
 ---
 
 Map values can be any type, including slices. A **map of slices** groups many items under one key, and it's one of the most useful data structures you'll build. Textio uses one to keep each user's message history.
@@ -147,3 +220,17 @@ counts["alice"]["monday"]++
 ```
 
 That extra bookkeeping is one reason maps of slices are more common than maps of maps. When you need several fields per key, a map of **structs** (coming up next chapter) is usually cleaner still.
+
+## Your turn
+
+Complete `groupByRecipient`. `recipients[i]` is the person who received `texts[i]`.
+Loop over the recipients with `for i, r := range recipients` and append each text to
+that recipient's slice in `groups`, using the `append` trick from this lesson. Each
+recipient's texts must stay in the order they were sent.
+
+**Run** should print:
+
+```text
+2 [Your code is 4821 Your order shipped]
+1 [Hi Bob]
+```

@@ -35,6 +35,43 @@ quiz:
     explanation: |
       Variables declared inside a function are local to that function. To
       share a value between functions, pass it as an argument or return it.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // printReceipt can't see main's variables, so it always prints 0.
+    func printReceipt() {
+    	fmt.Println("receipt: 0 messages")
+    }
+
+    func main() {
+    	sent := 42
+    	printReceipt()
+
+    	sent += 8
+    	printReceipt()
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func printReceipt(sent int) {
+    	fmt.Println("receipt:", sent, "messages")
+    }
+
+    func main() {
+    	sent := 42
+    	printReceipt(sent)
+
+    	sent += 8
+    	printReceipt(sent)
+    }
+  expected_output: |
+    receipt: 42 messages
+    receipt: 50 messages
 ---
 
 A variable's **scope** is the region of code where its name can be used. Outside its scope, the name simply doesn't exist, and the compiler will tell you so.
@@ -129,3 +166,16 @@ That `if` with a declaration before the condition is a Go feature you'll meet pr
 ## Parameters are local variables too
 
 A function's parameters are scoped to its body, just like variables declared inside it. Two different functions can both have a parameter called `message` without any conflict, because each lives in its own block.
+
+## Your turn
+
+`printReceipt` is supposed to show how many messages were sent, but `sent` lives in
+`main`'s block, so `printReceipt` can't see it. Instead of guessing, it just prints `0`.
+
+Give `printReceipt` an `int` parameter, use it in the message, and pass `sent` in
+both calls. The program should print:
+
+```text
+receipt: 42 messages
+receipt: 50 messages
+```

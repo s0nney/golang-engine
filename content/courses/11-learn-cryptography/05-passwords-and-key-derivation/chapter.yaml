@@ -1,0 +1,2 @@
+title: Passwords and Key Derivation
+description: Turn a low-entropy password into Keybox's master key with PBKDF2, understand salts, peppers and memory-hard KDFs, and derive independent subkeys from one key with HKDF.

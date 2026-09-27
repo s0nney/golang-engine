@@ -1,0 +1,2 @@
+title: Type Sets and Constraints
+description: Interfaces as sets of types, the tilde and unions, comparable and its Go 1.20 change, cmp.Ordered, and exactly which operations a type parameter allows.

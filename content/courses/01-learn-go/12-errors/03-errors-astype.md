@@ -47,6 +47,93 @@ quiz:
       `errors.Is` asks "is this particular error value in the chain?".
       `errors.AsType` asks "is there an error of this *type* in the chain?",
       and hands it back, fields and all.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"errors"
+    	"fmt"
+    )
+
+    type carrierError struct {
+    	carrier    string
+    	retryAfter int // seconds
+    }
+
+    func (e *carrierError) Error() string {
+    	return fmt.Sprintf("%s is busy", e.carrier)
+    }
+
+    // retryDelay returns how many seconds to wait before retrying after err.
+    // It's 0 unless err (or an error it wraps) is a *carrierError.
+    func retryDelay(err error) int {
+    	// ?
+    	return 0
+    }
+
+    func main() {
+    	busy := fmt.Errorf("send to bob: %w", &carrierError{"Alpha Mobile", 30})
+    	fmt.Println(retryDelay(busy))
+    	fmt.Println(retryDelay(errors.New("invalid phone number")))
+    	fmt.Println(retryDelay(nil))
+    }
+  solution: |
+    package main
+
+    import (
+    	"errors"
+    	"fmt"
+    )
+
+    type carrierError struct {
+    	carrier    string
+    	retryAfter int // seconds
+    }
+
+    func (e *carrierError) Error() string {
+    	return fmt.Sprintf("%s is busy", e.carrier)
+    }
+
+    func retryDelay(err error) int {
+    	if ce, ok := errors.AsType[*carrierError](err); ok {
+    		return ce.retryAfter
+    	}
+    	return 0
+    }
+
+    func main() {
+    	busy := fmt.Errorf("send to bob: %w", &carrierError{"Alpha Mobile", 30})
+    	fmt.Println(retryDelay(busy))
+    	fmt.Println(retryDelay(errors.New("invalid phone number")))
+    	fmt.Println(retryDelay(nil))
+    }
+  tests: |
+    package main
+
+    import (
+    	"errors"
+    	"fmt"
+    	"testing"
+    )
+
+    func TestRetryDelay(t *testing.T) {
+    	for _, tc := range []struct {
+    		err  error
+    		want int
+    	}{
+    		{&carrierError{"Alpha Mobile", 30}, 30},
+    		{fmt.Errorf("send to bob: %w", &carrierError{"Beta Tel", 5}), 5},
+    		{fmt.Errorf("batch 7: %w", fmt.Errorf("send to bob: %w", &carrierError{"Beta Tel", 90})), 90},
+    		{errors.New("invalid phone number"), 0},
+    		{fmt.Errorf("send to bob: %v", &carrierError{"Beta Tel", 5}), 0},
+    		{nil, 0},
+    	} {
+    		if got := retryDelay(tc.err); got != tc.want {
+    			t.Errorf("retryDelay(%v) = %d, want %d", tc.err, got, tc.want)
+    		}
+    	}
+    }
 ---
 
 `errors.Is` answers "is this a particular error?". But sometimes you need more than yes or no. If a carrier says "rate limited, retry in 30 seconds", you want that **30**. The information lives in the fields of a custom error type, so you need to pull the error out of the chain *as that type*.
@@ -128,6 +215,14 @@ It works, but it's clunkier: you declare the variable separately, it lives outsi
 | Is there an error of this type, and what's in it? | `errors.AsType[*carrierError](err)` |
 
 Most of the time, `err != nil` is all you need. Reach for `Is` and `AsType` when your code has to react differently to different failures.
+
+## Your turn
+
+Complete `retryDelay`. Use `errors.AsType[*carrierError](err)` to look for a carrier
+error anywhere in the chain. If there is one, return its `retryAfter`; otherwise
+return `0`. A `nil` error should also give `0` (`AsType` handles that for you).
+
+**Run** should print `30`, `0` and `0`.
 
 ## Further reading
 

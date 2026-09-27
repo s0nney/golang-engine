@@ -1,0 +1,2 @@
+title: Generic Data Structures
+description: Build Stash's core collections, a Set, an insertion-ordered map, an LRU cache and a heap, and expose them through iterators that work with the slices and maps packages.

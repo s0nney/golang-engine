@@ -1,0 +1,2 @@
+title: Randomness
+description: Why predictable randomness breaks everything, how crypto/rand gives you secure bytes, keys, tokens and nonces, how to avoid modulo bias, and how to test code that's random on purpose.

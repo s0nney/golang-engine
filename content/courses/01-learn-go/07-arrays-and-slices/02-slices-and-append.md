@@ -36,6 +36,74 @@ quiz:
       `append` returns the updated slice. You must store the result, almost
       always back into the same variable: `messages = append(messages, "hi")`.
       Go refuses to compile a call to `append` whose result is thrown away.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // longMessages returns the messages longer than limit bytes, in order.
+    func longMessages(messages []string, limit int) []string {
+    	var long []string
+    	// ?
+    	return long
+    }
+
+    func main() {
+    	outbox := []string{"hi", "Your order shipped", "ok", "See you at noon"}
+    	fmt.Println(longMessages(outbox, 5))
+    	fmt.Println(len(longMessages(outbox, 100)))
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func longMessages(messages []string, limit int) []string {
+    	var long []string
+    	for _, m := range messages {
+    		if len(m) > limit {
+    			long = append(long, m)
+    		}
+    	}
+    	return long
+    }
+
+    func main() {
+    	outbox := []string{"hi", "Your order shipped", "ok", "See you at noon"}
+    	fmt.Println(longMessages(outbox, 5))
+    	fmt.Println(len(longMessages(outbox, 100)))
+    }
+  tests: |
+    package main
+
+    import (
+    	"slices"
+    	"testing"
+    )
+
+    func TestLongMessages(t *testing.T) {
+    	outbox := []string{"hi", "Your order shipped", "ok", "See you at noon"}
+    	for _, tc := range []struct {
+    		messages []string
+    		limit    int
+    		want     []string
+    	}{
+    		{outbox, 5, []string{"Your order shipped", "See you at noon"}},
+    		{outbox, 1, outbox},
+    		{outbox, 2, []string{"Your order shipped", "See you at noon"}},
+    		{outbox, 100, nil},
+    		{nil, 3, nil},
+    	} {
+    		got := longMessages(tc.messages, tc.limit)
+    		if !slices.Equal(got, tc.want) {
+    			t.Errorf("longMessages(%q, %d) = %q, want %q", tc.messages, tc.limit, got, tc.want)
+    		}
+    	}
+    	if !slices.Equal(outbox, []string{"hi", "Your order shipped", "ok", "See you at noon"}) {
+    		t.Errorf("longMessages changed its input slice: %q", outbox)
+    	}
+    }
 ---
 
 A **slice** is Go's everyday list. Like an array, it holds an ordered sequence of values of one type. Unlike an array, its length can grow.
@@ -169,6 +237,15 @@ func main() {
 ```
 
 `make([]string, 3)` already has **three** empty strings in it, and `append` adds after them. If you plan to `append`, use `make([]string, 0, 3)` instead.
+
+## Your turn
+
+Complete `longMessages`. Loop over `messages` and `append` each one whose length
+is **greater than** `limit` to `long`. Remember to assign the result of `append`
+back to `long`. Keep the messages in their original order, and don't modify the
+input slice.
+
+**Run** should print `[Your order shipped See you at noon]` and then `0`.
 
 ## Further reading
 

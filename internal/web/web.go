@@ -3,10 +3,12 @@ package web
 
 import (
 	"cmp"
+	"context"
 	"embed"
 	"errors"
 	"log/slog"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +46,9 @@ func New(s *store.Store, run *runner.Runner) *fiber.App {
 	app.Use(session)
 	app.Get("/", h.home)
 	app.Post("/progress/reset", h.resetProgress)
+	app.Get("/exercises", h.exercises)
+	app.Get("/exercises/:course/:problem", h.problem)
+	app.Post("/exercises/:course/:problem", h.problem)
 	app.Get("/courses/:course", h.course)
 	app.Get("/courses/:course/:chapter/:lesson", h.lesson)
 	app.Post("/courses/:course/:chapter/:lesson", h.lesson)
@@ -172,6 +177,14 @@ func (h handler) lesson(c fiber.Ctx) error {
 	if i := v.Number; i < len(flat) {
 		v.Next = &flat[i]
 	}
+	if v.Prev == nil || v.Next == nil {
+		prev, next, err := h.neighbourCourses(ctx, key.Course)
+		if err != nil {
+			return err
+		}
+		v.Prev = cmp.Or(v.Prev, prev)
+		v.Next = cmp.Or(v.Next, next)
+	}
 	if e := lesson.Exercise; e != nil {
 		v.Code = cmp.Or(progress.Code, e.Starter)
 	}
@@ -211,13 +224,160 @@ func (h handler) lesson(c fiber.Ctx) error {
 			return err
 		}
 		if htmx {
-			return render(c, views.Exercise(v))
+			return render(c, views.Exercise(v.URL, v.Code))
 		}
 	default:
 		return fiber.ErrBadRequest
 	}
 	v.Complete = complete()
 	return render(c, views.LessonPage(v))
+}
+
+// exercises lists practice problems grouped by course, optionally filtered
+// by course and difficulty.
+func (h handler) exercises(c fiber.Ctx) error {
+	problems, err := h.store.Problems(c.Context())
+	if err != nil {
+		return err
+	}
+	solved, err := h.store.SolvedProblems(c.Context(), sessionID(c))
+	if err != nil {
+		return err
+	}
+	v := views.ExerciseList{Course: c.Query("course"), Level: c.Query("level"), Empty: len(problems) == 0}
+	if !slices.Contains(course.Difficulties, v.Level) {
+		v.Level = ""
+	}
+	var g *views.ProblemGroup
+	for _, p := range problems {
+		if g == nil || v.Courses[len(v.Courses)-1].URL != p.Course {
+			v.Courses = append(v.Courses, views.Link{URL: p.Course, Title: p.CourseTitle})
+			v.Groups = append(v.Groups, views.ProblemGroup{Title: p.CourseTitle})
+			g = &v.Groups[len(v.Groups)-1]
+		}
+		done := solved[store.PracticeKey{Course: p.Course, Problem: p.Slug}]
+		i := slices.IndexFunc(g.Levels, func(l views.LevelCount) bool { return l.Level == p.Difficulty })
+		if i < 0 {
+			g.Levels = append(g.Levels, views.LevelCount{Level: p.Difficulty})
+			i = len(g.Levels) - 1
+		}
+		g.Levels[i].Total++
+		if done {
+			g.Levels[i].Solved++
+		}
+		if (v.Course == "" || v.Course == p.Course) && (v.Level == "" || v.Level == p.Difficulty) {
+			g.Problems = append(g.Problems, views.ProblemRow{ProblemSummary: p, URL: views.ProblemURL(p.Course, p.Slug), Solved: done})
+		}
+	}
+	v.Groups = slices.DeleteFunc(v.Groups, func(g views.ProblemGroup) bool { return len(g.Problems) == 0 })
+	return render(c, views.Exercises(v))
+}
+
+// problem renders a practice problem. POSTs run, submit or reset its code,
+// exactly like a lesson exercise.
+func (h handler) problem(c fiber.Ctx) error {
+	ctx, sess := c.Context(), sessionID(c)
+	key := store.PracticeKey{Course: c.Params("course"), Problem: c.Params("problem")}
+	p, err := h.store.Problem(ctx, key.Course, key.Problem)
+	if err != nil {
+		return err
+	}
+	progress, err := h.store.PracticeProgress(ctx, sess, key)
+	if err != nil {
+		return err
+	}
+	v := views.ProblemPage{
+		Problem:  p,
+		URL:      views.ProblemURL(key.Course, key.Problem),
+		Code:     cmp.Or(progress.Code, p.Exercise.Starter),
+		Solved:   progress.Passed,
+		Attempts: progress.Attempts,
+	}
+	// Previous and next follow the exercises page order within the course.
+	all, err := h.store.Problems(ctx)
+	if err != nil {
+		return err
+	}
+	var siblings []views.Link
+	for _, s := range all {
+		if s.Course == key.Course {
+			siblings = append(siblings, views.Link{URL: views.ProblemURL(s.Course, s.Slug), Title: s.Title})
+		}
+	}
+	if i := slices.IndexFunc(siblings, func(l views.Link) bool { return l.URL == v.URL }); i >= 0 {
+		if i > 0 {
+			v.Prev = &siblings[i-1]
+		}
+		if i+1 < len(siblings) {
+			v.Next = &siblings[i+1]
+		}
+	}
+
+	htmx := c.Get("HX-Request") == "true"
+	switch action := c.FormValue("action"); {
+	case c.Method() != fiber.MethodPost:
+	case action == "run" || action == "submit":
+		v.Code = normalizeCode(c.FormValue("code"))
+		out := h.runExercise(c, p.Exercise, v.Code, action == "submit")
+		if err := h.store.SavePractice(ctx, sess, key, v.Code, out.Submit, out.Passed, browserNow(c)); err != nil {
+			return err
+		}
+		out.Practice, out.Next = true, v.Next
+		out.Complete = out.Passed && !v.Solved
+		v.Solved = v.Solved || out.Passed
+		if out.Submit {
+			v.Attempts++
+		}
+		if htmx {
+			return render(c, views.Output(out))
+		}
+		v.Output = &out
+	case action == "reset":
+		v.Code = p.Exercise.Starter
+		if err := h.store.SavePractice(ctx, sess, key, "", false, false, browserNow(c)); err != nil {
+			return err
+		}
+		if htmx {
+			return render(c, views.Exercise(v.URL, v.Code))
+		}
+	default:
+		return fiber.ErrBadRequest
+	}
+	return render(c, views.Problem(v))
+}
+
+// neighbourCourses links the last lesson of the previous course and the first
+// lesson of the next one, so paging continues across the roadmap. Either is
+// nil at the ends of the roadmap.
+func (h handler) neighbourCourses(ctx context.Context, slug string) (prev, next *views.Link, err error) {
+	courses, err := h.store.Courses(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	i := slices.IndexFunc(courses, func(c store.CourseSummary) bool { return c.Slug == slug })
+	edge := func(j int, last bool) (*views.Link, error) {
+		if i < 0 || j < 0 || j >= len(courses) {
+			return nil, nil
+		}
+		o, err := h.store.Outline(ctx, courses[j].Slug)
+		if err != nil || len(o.Chapters) == 0 {
+			return nil, err
+		}
+		ch := o.Chapters[0]
+		if last {
+			ch = o.Chapters[len(o.Chapters)-1]
+		}
+		l := ch.Lessons[0]
+		if last {
+			l = ch.Lessons[len(ch.Lessons)-1]
+		}
+		return &views.Link{URL: views.LessonURL(o.Slug, ch.Slug, l.Slug), Title: l.Title, Course: o.Title}, nil
+	}
+	if prev, err = edge(i-1, true); err != nil {
+		return nil, nil, err
+	}
+	next, err = edge(i+1, false)
+	return prev, next, err
 }
 
 func (h handler) runExercise(c fiber.Ctx, e *course.Exercise, code string, submit bool) views.RunResult {

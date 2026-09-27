@@ -93,7 +93,9 @@ img { max-width: 100%; }
 
 small, .crumbs { color: var(--muted); }
 .crumbs { font-size: 0.9rem; margin: 1.5rem 0 0; }
-.crumbs .count { float: right; }
+.crumbs { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.crumbs p { margin: 0; }
+.crumbs .count { display: flex; align-items: center; gap: 0.25rem; }
 
 .narrow { max-width: 680px; margin: 0 auto; }
 
@@ -116,6 +118,8 @@ button.quiet { background: transparent; border-color: var(--line); color: var(--
 .roadmap, .chapters { padding-left: 1.4rem; }
 .roadmap > li { margin-bottom: 1.5rem; }
 .roadmap p { margin: 0.2rem 0; }
+#beyond { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.track-intro { color: var(--muted); margin-top: 0; }
 .chapters > li::marker { font-size: 1.35rem; font-weight: 700; }
 .chapters ol { padding-left: 1.2rem; }
 
@@ -225,16 +229,81 @@ button.quiet { background: transparent; border-color: var(--line); color: var(--
 progress { display: block; width: 100%; max-width: 20rem; height: 0.4rem; margin-top: 0.3rem; accent-color: var(--right); }
 .reset { margin-top: 3rem; }
 
+.lesson-nav { display: inline-flex; gap: 0.4rem; margin-left: 0.5rem; vertical-align: middle; }
+.lesson-nav a {
+	padding: 0.15rem 0.6rem;
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	font-size: 0.85rem;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.lesson-nav a.next { border-color: var(--accent); }
+.lesson-nav a:hover, .lesson-nav a:focus-visible { background: var(--code-bg); }
+
 .pager {
-	display: flex;
-	justify-content: space-between;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
 	gap: 1rem;
 	margin-top: 3rem;
-	padding-top: 1rem;
+	padding-top: 1.5rem;
 	border-top: 1px solid var(--line);
-	font-size: 0.95rem;
 }
-.pager a[rel="next"], .pager a:last-child { text-align: right; }
+.pager-link {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	padding: 0.8rem 1rem;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	text-decoration: none;
+	color: var(--accent);
+	min-width: 0;
+}
+.pager-link small { color: var(--muted); font-size: 0.8rem; }
+.pager-link span { font-weight: 600; overflow-wrap: anywhere; }
+.pager-link.prev:hover, .pager-link.prev:focus-visible { border-color: var(--accent); background: var(--code-bg); }
+.pager-link.next { grid-column: 2; text-align: right; align-items: flex-end; background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.pager-link.next small { color: color-mix(in srgb, var(--bg) 80%, transparent); }
+.pager-link.next:hover, .pager-link.next:focus-visible { filter: brightness(1.1); }
+.pager-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 560px) {
+	.pager { grid-template-columns: 1fr; }
+	.pager-link.next { grid-column: 1; order: -1; }
+}
+
+/* Exercises: practice problems by difficulty. */
+.badge {
+	display: inline-block;
+	padding: 0.05rem 0.5rem;
+	border-radius: 999px;
+	border: 1px solid currentColor;
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	vertical-align: middle;
+	text-transform: uppercase;
+}
+.badge.easy { color: var(--right); }
+.badge.medium { color: var(--tok-number); }
+.badge.hard { color: var(--wrong); }
+h1 .badge { font-size: 0.8rem; margin-left: 0.4rem; }
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem 1rem; margin: 1.5rem 0; }
+.filters label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; color: var(--muted); }
+.filters select { font: inherit; font-size: 0.95rem; padding: 0.35rem 0.5rem; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); }
+.problem-group { margin-top: 2rem; }
+.problem-group h2 { margin-bottom: 0.2rem; }
+.level-counts { margin: 0 0 0.75rem; font-size: 0.85rem; color: var(--muted); }
+.problems { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+.problems li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; padding: 0.6rem 0; border-bottom: 1px solid var(--line); }
+.problems li a { font-weight: 600; }
+.problems li small { flex-basis: 100%; }
+.draws-on { color: var(--muted); font-size: 0.9rem; margin-top: -0.5rem; }
+.hints { margin-top: 2rem; }
+.hints h2 { font-size: 1rem; }
+.hints details { border: 1px solid var(--line); border-radius: 4px; padding: 0.4rem 0.75rem; margin-bottom: 0.5rem; }
+.hints summary { cursor: pointer; color: var(--accent); }
+.hints details[open] summary { margin-bottom: 0.3rem; }
 
 .sr-only {
 	position: absolute; width: 1px; height: 1px;

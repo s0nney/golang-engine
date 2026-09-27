@@ -23,6 +23,119 @@ quiz:
       The standard library uses `All` for "iterate over everything", as in
       `slices.All` and `maps.All`, and `Backward`, `Keys` and `Values` for other
       orders and views. Following the convention makes your types feel familiar.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"fmt"
+    	"iter"
+    )
+
+    // Headings yields the 1-based line number and title of every line that
+    // starts with "# ". It must stop as soon as yield returns false.
+    func Headings(doc string) iter.Seq2[int, string] {
+    	return func(yield func(int, string) bool) {
+    		// ?
+    	}
+    }
+
+    func main() {
+    	doc := "# Intro\nWelcome.\n\n# Setup\nRun go.\n# Usage\n"
+    	for n, title := range Headings(doc) {
+    		fmt.Printf("line %d: %s\n", n, title)
+    	}
+    	for _, title := range Headings(doc) {
+    		fmt.Println("first heading:", title)
+    		break
+    	}
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"iter"
+    	"strings"
+    )
+
+    func Headings(doc string) iter.Seq2[int, string] {
+    	return func(yield func(int, string) bool) {
+    		n := 0
+    		for line := range strings.Lines(doc) {
+    			n++
+    			title, ok := strings.CutPrefix(strings.TrimRight(line, "\n"), "# ")
+    			if !ok {
+    				continue
+    			}
+    			if !yield(n, title) {
+    				return
+    			}
+    		}
+    	}
+    }
+
+    func main() {
+    	doc := "# Intro\nWelcome.\n\n# Setup\nRun go.\n# Usage\n"
+    	for n, title := range Headings(doc) {
+    		fmt.Printf("line %d: %s\n", n, title)
+    	}
+    	for _, title := range Headings(doc) {
+    		fmt.Println("first heading:", title)
+    		break
+    	}
+    }
+  tests: |
+    package main
+
+    import (
+    	"fmt"
+    	"testing"
+    )
+
+    func collect(doc string) []string {
+    	var got []string
+    	for n, title := range Headings(doc) {
+    		got = append(got, fmt.Sprintf("%d:%s", n, title))
+    	}
+    	return got
+    }
+
+    func TestHeadings(t *testing.T) {
+    	for _, tt := range []struct {
+    		doc  string
+    		want string
+    	}{
+    		{"# Intro\nWelcome.\n\n# Setup\nRun go.\n# Usage\n", "[1:Intro 4:Setup 6:Usage]"},
+    		{"no headings here\n## not level one\n#nospace\n", "[]"},
+    		{"text\n# Last line without newline", "[2:Last line without newline]"},
+    		{"", "[]"},
+    		{"# A\n# B\n", "[1:A 2:B]"},
+    	} {
+    		got := collect(tt.doc)
+    		if fmt.Sprint(got) != tt.want && !(len(got) == 0 && tt.want == "[]") {
+    			t.Errorf("Headings(%q) yielded %v, want %s", tt.doc, got, tt.want)
+    		}
+    	}
+    }
+
+    func TestHeadingsStopsEarly(t *testing.T) {
+    	defer func() {
+    		if r := recover(); r != nil {
+    			t.Fatalf("Headings kept yielding after the loop broke: %v", r)
+    		}
+    	}()
+    	var got []string
+    	for n, title := range Headings("# One\n# Two\n# Three\n") {
+    		got = append(got, fmt.Sprintf("%d:%s", n, title))
+    		if len(got) == 2 {
+    			break
+    		}
+    	}
+    	if fmt.Sprint(got) != "[1:One 2:Two]" {
+    		t.Errorf("breaking after two headings gave %v, want [1:One 2:Two]", got)
+    	}
+    }
 ---
 
 Now let's write iterators for Doc2Doc's own types, and meet `iter.Seq`'s two-valued
@@ -150,6 +263,14 @@ Why not just return a `[]*Section`?
 A slice is still better when the caller needs random access, `len`, or to loop over
 the data several times. And if they want a slice anyway, `slices.Collect(seq)` makes
 one.
+
+## Your turn
+
+Complete `Headings(doc)`, an `iter.Seq2[int, string]` that yields the **1-based line number** and the **title** of every line starting with `# ` (a level-one Markdown heading; `## ` and `#nospace` don't count).
+
+- `strings.Lines(doc)` iterates over the lines, each still ending in `"\n"` (except possibly the last), so trim that off before looking at the line.
+- `strings.CutPrefix(line, "# ")` gives you the title and whether the prefix was there.
+- Respect early termination: the moment `yield` returns `false`, return. The tests `break` out of a loop and fail if your iterator keeps going.
 
 ## Further reading
 

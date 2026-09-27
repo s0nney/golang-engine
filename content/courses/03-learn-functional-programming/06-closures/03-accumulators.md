@@ -38,6 +38,95 @@ quiz:
     explanation: |
       Closures created in the same call share the variables of that call. Both
       functions refer to the one `counts` variable created by that `wordStats` call.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"fmt"
+    	"strings"
+    )
+
+    // vocabulary returns an accumulator. Each call adds the words of doc
+    // (split with strings.Fields, compared case-insensitively) to the set of
+    // words seen so far, and returns how many DISTINCT words it has seen in
+    // total. Separate accumulators must not share state.
+    func vocabulary() func(doc string) int {
+    	// ?
+    	return func(doc string) int {
+    		return len(strings.Fields(doc))
+    	}
+    }
+
+    func main() {
+    	add := vocabulary()
+    	fmt.Println(add("the quick fox")) // 3
+    	fmt.Println(add("The lazy dog"))  // 5: "the" is not new
+    	fmt.Println(add("THE FOX"))       // 5
+
+    	other := vocabulary()
+    	fmt.Println(other("brand new counter")) // 3
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"strings"
+    )
+
+    func vocabulary() func(doc string) int {
+    	seen := map[string]bool{}
+    	return func(doc string) int {
+    		for _, w := range strings.Fields(doc) {
+    			seen[strings.ToLower(w)] = true
+    		}
+    		return len(seen)
+    	}
+    }
+
+    func main() {
+    	add := vocabulary()
+    	fmt.Println(add("the quick fox"))
+    	fmt.Println(add("The lazy dog"))
+    	fmt.Println(add("THE FOX"))
+
+    	other := vocabulary()
+    	fmt.Println(other("brand new counter"))
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestVocabulary(t *testing.T) {
+    	add := vocabulary()
+    	for _, tt := range []struct {
+    		doc  string
+    		want int
+    	}{
+    		{"the quick fox", 3},
+    		{"The lazy dog", 5},
+    		{"THE FOX", 5},
+    		{"", 5},
+    		{"jumps  over\nthe\tdog", 7},
+    	} {
+    		if got := add(tt.doc); got != tt.want {
+    			t.Errorf("after adding %q: distinct words = %d, want %d", tt.doc, got, tt.want)
+    		}
+    	}
+    }
+
+    func TestVocabularyIndependent(t *testing.T) {
+    	a, b := vocabulary(), vocabulary()
+    	a("one two three")
+    	if got := b("one"); got != 1 {
+    		t.Errorf("a second vocabulary() saw %d words after adding %q, want 1 (accumulators must not share state)", got, "one")
+    	}
+    	if got := a("four"); got != 4 {
+    		t.Errorf("first vocabulary() = %d after 4 distinct words, want 4", got)
+    	}
+    }
 ---
 
 A counter only goes up by one. An **accumulator** is its bigger sibling: a closure
@@ -146,3 +235,10 @@ Both fold many values into one. The difference is control:
 
 Prefer `Reduce` (or a loop) when you have all the data. Reach for an accumulator when
 data trickles in over time, such as lines from a stream or events from a server.
+
+## Your turn
+
+Doc2Doc's style checker wants to know how rich a book's vocabulary is, chapter by chapter. Complete `vocabulary()`. It returns an accumulator: each call adds the words of one document to the set of words seen so far and returns how many **distinct** words that is in total.
+
+- Split words with `strings.Fields` and compare them case-insensitively (`The` and `the` are the same word).
+- Keep the set in a `map[string]bool` captured by the closure, created inside `vocabulary` so that two accumulators never share state.

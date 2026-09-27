@@ -25,7 +25,7 @@ exercise:
     func main() {
     	counts, err := schedulerCounts()
     	fmt.Println("goroutines:", counts["/sched/goroutines:goroutines"])
-    	fmt.Println("Go execution threads:", counts["/sched/gomaxprocs:threads"])
+    	fmt.Println("GOMAXPROCS:", counts["/sched/gomaxprocs:threads"])
     	fmt.Println("error:", err)
     }
   solution: |
@@ -55,7 +55,7 @@ exercise:
     func main() {
     	counts, err := schedulerCounts()
     	fmt.Println("goroutines:", counts["/sched/goroutines:goroutines"])
-    	fmt.Println("Go execution threads:", counts["/sched/gomaxprocs:threads"])
+    	fmt.Println("GOMAXPROCS:", counts["/sched/gomaxprocs:threads"])
     	fmt.Println("error:", err)
     }
   tests: |
@@ -140,7 +140,7 @@ and your queue depth before changing `GOMAXPROCS`.
 
 Use repeated measurements with the same workload. For cumulative counters, compare
 deltas over an interval and account for process restarts. Metrics summarize behavior;
-they don't identify the exact line causing it. The next lesson supplies that view.
+they don't identify the exact line causing it. Goroutine dumps and profiles do; [Learn Testing](/courses/learn-testing/coverage-and-tooling/profiling-with-pprof) shows how to collect and read them with `pprof`.
 
 ## Your task
 

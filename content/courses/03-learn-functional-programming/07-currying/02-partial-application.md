@@ -35,6 +35,130 @@ quiz:
       `Partial` fixed the *first* argument, so this calls
       `strings.HasSuffix(".md", "notes.md")`, asking whether `".md"` ends in
       `"notes.md"`. It doesn't. Argument order matters!
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"fmt"
+    	"strings"
+    )
+
+    func Partial[A, B, R any](f func(A, B) R, a A) func(B) R {
+    	return func(b B) R { return f(a, b) }
+    }
+
+    // Flip returns a function that takes f's two arguments in the opposite order.
+    func Flip[A, B, R any](f func(A, B) R) func(B, A) R {
+    	return func(b B, a A) R {
+    		var zero R
+    		return zero // ?
+    	}
+    }
+
+    // Uncurry turns a curried function back into a two-argument one:
+    // Uncurry(f)(a, b) == f(a)(b).
+    func Uncurry[A, B, R any](f func(A) func(B) R) func(A, B) R {
+    	return func(a A, b B) R {
+    		var zero R
+    		return zero // ?
+    	}
+    }
+
+    func wrapTag(tag string) func(string) string {
+    	return func(s string) string { return "<" + tag + ">" + s + "</" + tag + ">" }
+    }
+
+    func main() {
+    	hasTodo := Partial(Flip(strings.Contains), "TODO")
+    	fmt.Println(hasTodo("TODO: add the date"), hasTodo("all done")) // true false
+
+    	wrap := Uncurry(wrapTag)
+    	fmt.Println(wrap("em", "really")) // <em>really</em>
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"strings"
+    )
+
+    func Partial[A, B, R any](f func(A, B) R, a A) func(B) R {
+    	return func(b B) R { return f(a, b) }
+    }
+
+    func Flip[A, B, R any](f func(A, B) R) func(B, A) R {
+    	return func(b B, a A) R { return f(a, b) }
+    }
+
+    func Uncurry[A, B, R any](f func(A) func(B) R) func(A, B) R {
+    	return func(a A, b B) R { return f(a)(b) }
+    }
+
+    func wrapTag(tag string) func(string) string {
+    	return func(s string) string { return "<" + tag + ">" + s + "</" + tag + ">" }
+    }
+
+    func main() {
+    	hasTodo := Partial(Flip(strings.Contains), "TODO")
+    	fmt.Println(hasTodo("TODO: add the date"), hasTodo("all done"))
+
+    	wrap := Uncurry(wrapTag)
+    	fmt.Println(wrap("em", "really"))
+    }
+  tests: |
+    package main
+
+    import (
+    	"fmt"
+    	"strings"
+    	"testing"
+    )
+
+    func TestFlip(t *testing.T) {
+    	flipped := Flip(strings.Repeat)
+    	if flipped == nil {
+    		t.Fatal("Flip(strings.Repeat) returned nil")
+    	}
+    	if got := flipped(3, "ab"); got != "ababab" {
+    		t.Errorf("Flip(strings.Repeat)(3, %q) = %q, want %q", "ab", got, "ababab")
+    	}
+    	sub := Flip(func(a, b int) int { return a - b })
+    	if got := sub(10, 3); got != -7 {
+    		t.Errorf("Flip(a - b)(10, 3) = %d, want -7", got)
+    	}
+    	contains := Flip(strings.Contains)
+    	if !contains("TODO", "x TODO y") || contains("TODO", "done") {
+    		t.Errorf("Flip(strings.Contains)(substr, s) gives the wrong answers")
+    	}
+    }
+
+    func TestUncurry(t *testing.T) {
+    	join := Uncurry(func(sep string) func(parts []string) string {
+    		return func(parts []string) string { return strings.Join(parts, sep) }
+    	})
+    	if join == nil {
+    		t.Fatal("Uncurry(...) returned nil")
+    	}
+    	if got := join(", ", []string{"a", "b"}); got != "a, b" {
+    		t.Errorf("Uncurry(join)(%q, [a b]) = %q, want %q", ", ", got, "a, b")
+    	}
+    	w := Uncurry(wrapTag)
+    	if got := w("code", "go vet"); got != "<code>go vet</code>" {
+    		t.Errorf("Uncurry(wrapTag)(%q, %q) = %q, want %q", "code", "go vet", got, "<code>go vet</code>")
+    	}
+    	calls := 0
+    	count := Uncurry(func(n int) func(s string) string {
+    		calls++
+    		return func(s string) string { return fmt.Sprint(n, s) }
+    	})
+    	count(1, "x")
+    	count(2, "y")
+    	if calls != 2 {
+    		t.Errorf("Uncurry should call the outer function once per call, got %d calls for 2 uses", calls)
+    	}
+    }
 ---
 
 **Partial application** means fixing some of a function's arguments now and getting
@@ -117,3 +241,12 @@ Several everyday Go idioms are partial application in disguise:
 
 Whenever you catch yourself passing the same first few arguments over and over,
 partial application lets you fix them once and name the result.
+
+## Your turn
+
+`Partial` fixes the *first* argument. But `strings.Contains(s, substr)` takes the document first, and Doc2Doc wants to fix the *substring*: "does this document contain TODO?". Two more generic helpers make any function fit:
+
+1. `Flip(f)` returns a function taking `f`'s two arguments in the opposite order: `Flip(f)(b, a) == f(a, b)`.
+2. `Uncurry(f)` turns a curried function back into a two-argument one: `Uncurry(f)(a, b) == f(a)(b)`.
+
+With them, `Partial(Flip(strings.Contains), "TODO")` is a ready-made `func(string) bool`.

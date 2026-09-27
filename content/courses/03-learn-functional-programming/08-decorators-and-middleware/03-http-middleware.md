@@ -1,157 +1,162 @@
 ---
-title: HTTP Middleware
+title: Middleware
 quiz:
-  - question: What is the usual signature of a middleware in Go's `net/http` world?
+  - question: 'With `type Converter func(string) string`, what is the signature of a Doc2Doc middleware?'
     options:
-      - text: '`func(http.Handler) http.Handler`'
+      - text: '`func(string) string`'
+      - text: '`func(Converter)`'
+      - text: '`func(Converter) Converter`'
         correct: true
-      - text: '`func(http.ResponseWriter, *http.Request)`'
-      - text: '`func(*http.Request) error`'
-      - text: '`func(http.Handler)`'
+      - text: '`func(Converter) string`'
     explanation: |
-      Middleware takes the next handler and returns a new handler that wraps it.
-      Because the input and output types match, middleware can be stacked.
-  - question: |
-      How can a plain function like `func(w http.ResponseWriter, r *http.Request)` be used where an `http.Handler` interface is required?
+      Middleware takes the next converter and returns a new converter that wraps it.
+      Because the input and output types match, middleware can be stacked as many
+      times as you like.
+  - question: 'In this lesson, what happens when `maxSize(20)` receives a 32-byte document?'
     options:
-      - text: Functions automatically implement every interface
-      - text: Wrap it in a struct with a `Handler` field
-      - text: Convert it with `http.HandlerFunc(f)`, a function type whose `ServeHTTP` method calls the function
+      - text: It truncates the document to 20 bytes and passes it on
+      - text: It returns a placeholder without calling `next`, so the real converter never runs
         correct: true
+      - text: It calls `next` and then throws away the result
+      - text: It panics
     explanation: |
-      `http.HandlerFunc` is a named function type with a `ServeHTTP` method that
-      just calls itself. Converting your function to it makes it satisfy
-      `http.Handler`. It's the adapter pattern from the Function Types lesson.
-  - question: 'In `requireToken` from this lesson, what happens when the token is wrong?'
+      Middleware decides whether to call `next` at all. Returning early
+      short-circuits the chain, so `markdownToHTML` never runs, which is why its
+      "runs" line is missing from the second conversion's output.
+  - question: 'Why is `maxSize` written as `func(limit int) Middleware` instead of being a `Middleware` itself?'
     options:
-      - text: The middleware writes a 401 response and returns without calling `next`
+      - text: Because Go doesn't allow functions with three levels of nesting
+      - text: Because it needs a setting (`limit`), so it's a function that *builds* a middleware, which is currying from the last chapter
         correct: true
-      - text: The request still reaches the wrapped handler, which is expected to check again
-      - text: The server crashes
+      - text: Because middleware must never take arguments
     explanation: |
-      Middleware decides whether to call `next.ServeHTTP` at all. Returning early
-      short-circuits the chain, so the protected handler never runs.
+      Configurable middleware takes its settings first and returns a
+      `Middleware`: `maxSize(20)(convert)`. Simple middleware like `logCalls`
+      already has the right shape.
 ---
 
-Wrapping functions is nice, but the place you'll use it most in real Go code is
-**HTTP middleware**. It's the canonical Go "decorator".
+Wrapping one function is handy. Once you have several wrappers that all take and
+return the same function type, you have **middleware**: layers you can put around
+any converter, in any combination. It's the most common form of the decorator idea
+in real Go code.
 
-Doc2Doc is growing a web API: `POST /convert` takes a document and returns HTML.
-Every endpoint needs logging, authentication and panic recovery. You don't want that
-code copied into every handler.
+## One shape for every converter
 
-## Handlers are functions in disguise
-
-Everything in `net/http` revolves around one interface:
-
-```go
-type Handler interface {
-	ServeHTTP(ResponseWriter, *Request)
-}
-```
-
-And one function type that adapts plain functions to it:
+Every Doc2Doc converter has the same shape: a document goes in, a converted document
+comes out. Give that shape a name, and give "something that wraps a converter" a name
+too:
 
 ```go
-type HandlerFunc func(ResponseWriter, *Request)
+// Converter turns a document in one format into another.
+type Converter func(string) string
 
-func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) { f(w, r) }
+// Middleware wraps a Converter and returns an enhanced one.
+type Middleware func(Converter) Converter
 ```
 
-That's the function-type-with-a-method trick from earlier in the course, used by the
-standard library itself.
+`Converter` is the same shape as the `Transform` type from earlier in the chapter. A
+`Middleware` is any function that takes the *next* converter and returns a new one
+that calls it (or doesn't).
 
-## Middleware is a handler wrapper
+## Two middlewares for Doc2Doc
 
-A middleware takes a handler and returns a new handler:
-
-```go
-func(next http.Handler) http.Handler
-```
-
-Here are two for Doc2Doc, plus a test run using `httptest`, so no real server or
-network is needed:
+Every converter needs logging, and none of them should waste time on enormous
+documents. Neither concern belongs inside `markdownToHTML`, so write them as
+middleware:
 
 ```go
 package main
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 )
 
-func logRequests(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("->", r.Method, r.URL.Path)
-		next.ServeHTTP(w, r)
-		fmt.Println("<-", r.Method, r.URL.Path)
-	})
-}
+// Converter turns a document in one format into another.
+type Converter func(string) string
 
-func requireToken(token string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Header.Get("Authorization") != "Bearer "+token {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return // don't call next
-			}
-			next.ServeHTTP(w, r)
-		})
+// Middleware wraps a Converter and returns an enhanced one.
+type Middleware func(Converter) Converter
+
+func logCalls(next Converter) Converter {
+	return func(doc string) string {
+		fmt.Printf("-> converting %d bytes\n", len(doc))
+		out := next(doc)
+		fmt.Printf("<- produced %d bytes\n", len(out))
+		return out
 	}
 }
 
-func convert(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("   converting")
-	fmt.Fprint(w, "<h1>Hello</h1>")
+func maxSize(limit int) Middleware {
+	return func(next Converter) Converter {
+		return func(doc string) string {
+			if len(doc) > limit {
+				return "<!-- document too large -->"
+			}
+			return next(doc) // only reached for small documents
+		}
+	}
+}
+
+func markdownToHTML(doc string) string {
+	fmt.Println("   markdownToHTML runs")
+	title := strings.TrimPrefix(doc, "# ")
+	return "<h1>" + title + "</h1>"
 }
 
 func main() {
-	var h http.Handler = http.HandlerFunc(convert)
-	h = requireToken("s3cret")(h)
-	h = logRequests(h)
+	var convert Converter = markdownToHTML
+	convert = maxSize(20)(convert)
+	convert = logCalls(convert)
 
-	for _, auth := range []string{"Bearer s3cret", "Bearer nope"} {
-		req := httptest.NewRequest("POST", "/convert", strings.NewReader("# Hello"))
-		req.Header.Set("Authorization", auth)
-		rec := httptest.NewRecorder()
-
-		h.ServeHTTP(rec, req)
-		fmt.Println(rec.Code, strings.TrimSpace(rec.Body.String()))
+	for _, doc := range []string{"# Hello", "# A heading that is far too long"} {
+		fmt.Println(convert(doc))
 	}
 }
 ```
 
 ```text
--> POST /convert
-   converting
-<- POST /convert
-200 <h1>Hello</h1>
--> POST /convert
-<- POST /convert
-401 unauthorized
+-> converting 7 bytes
+   markdownToHTML runs
+<- produced 14 bytes
+<h1>Hello</h1>
+-> converting 32 bytes
+<- produced 27 bytes
+<!-- document too large -->
 ```
 
-Notice what happened on the second request. `logRequests` ran (it's the outer
-layer), but `requireToken` stopped the request and `convert` never ran.
+Notice what happened on the second document. `logCalls` ran (it's the outer layer),
+but `maxSize` stopped the document and `markdownToHTML` never ran. `logCalls` still
+logged the placeholder coming back out, because from the outside a short-circuit
+looks like any other result.
 
 ## Two kinds of middleware
 
-- **Simple middleware** like `logRequests` has the signature
-  `func(http.Handler) http.Handler` directly.
-- **Configurable middleware** like `requireToken` needs settings, so it's a function
+- **Simple middleware** like `logCalls` has the signature
+  `func(Converter) Converter` directly, so it *is* a `Middleware`.
+- **Configurable middleware** like `maxSize` needs settings, so it's a function
   that *returns* a middleware. That's currying from the last chapter:
-  `requireToken("s3cret")(h)`.
+  `maxSize(20)(convert)`.
 
-## Hooking it into a server
+## Before, after, or instead
 
-In a real program you'd wrap the handler and register it with a `ServeMux`:
+Everything a middleware can do falls into three spots:
 
-```go
-mux := http.NewServeMux()
-mux.Handle("POST /convert", logRequests(requireToken(token)(http.HandlerFunc(convert))))
-log.Fatal(http.ListenAndServe(":8080", mux))
-```
+- **Before** calling `next`: inspect or change the input (trim whitespace, normalise
+  line endings, reject bad input).
+- **After** `next` returns: inspect or change the output (log its size, add a footer,
+  cache it).
+- **Instead of** calling `next`: short-circuit with a different answer, like
+  `maxSize` does.
 
-That nesting gets ugly fast. The next lesson fixes it with a `Chain` helper.
+`markdownToHTML` stays a plain, pure function that knows nothing about logging or
+limits. Each concern lives in one small wrapper you can test on its own.
+
+## Coming back in HTTP
+
+You'll meet this exact pattern again in [Learn HTTP Servers](/courses/learn-http-servers),
+where Go's web handlers are wrapped with middleware of the shape
+`func(http.Handler) http.Handler`. Different type, same idea.
+
+Wrapping by hand, one assignment per layer, gets tedious. The next lesson adds a
+`Chain` helper.

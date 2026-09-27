@@ -33,6 +33,59 @@ quiz:
       `strconv.Itoa` ("integer to ASCII") returns the digits as text.
       `string(42)` is a trap: it gives you the character with code 42, which
       is `"*"`. `go vet` even warns you about it.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"fmt"
+    	"strconv"
+    )
+
+    func main() {
+    	messages := 150
+    	costPerMessage := 0.02
+    	imported := "42"
+    	_ = imported // delete this line once you use imported below
+
+    	// ? multiply by messages too (convert it to a float64 first)
+    	totalCost := costPerMessage
+    	fmt.Println("total cost:", totalCost)
+
+    	// ? parse imported instead of "0"
+    	extra, err := strconv.Atoi("0")
+    	fmt.Println("messages after import:", messages+extra, err)
+
+    	// ? build the receipt with strconv.Itoa
+    	receipt := "Sent " + "?" + " messages"
+    	fmt.Println(receipt)
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"strconv"
+    )
+
+    func main() {
+    	messages := 150
+    	costPerMessage := 0.02
+    	imported := "42"
+
+    	totalCost := float64(messages) * costPerMessage
+    	fmt.Println("total cost:", totalCost)
+
+    	extra, err := strconv.Atoi(imported)
+    	fmt.Println("messages after import:", messages+extra, err)
+
+    	receipt := "Sent " + strconv.Itoa(messages) + " messages"
+    	fmt.Println(receipt)
+    }
+  expected_output: |
+    total cost: 3
+    messages after import: 192 <nil>
+    Sent 150 messages
 ---
 
 Go is strict about types. It will **never** silently convert a value from one type to another for you. If you want to mix types, you convert explicitly.
@@ -141,6 +194,22 @@ fmt.Println(string(65)) // prints "A", not "65"!
 ```
 
 Converting an integer to a `string` treats it as a character code, and 65 is the code for `A`. This catches so many people that `go vet` (a tool that checks for suspicious code) warns about it. Use `strconv.Itoa` or `fmt.Sprint` instead.
+
+## Your turn
+
+Textio just imported a batch of 42 messages from a text file, so the count arrived
+as a `string`. Fix the three `?` spots so the program prints exactly:
+
+```text
+total cost: 3
+messages after import: 192 <nil>
+Sent 150 messages
+```
+
+1. Convert `messages` to a `float64` before multiplying.
+2. Pass `imported` to `strconv.Atoi` instead of `"0"`, and delete the `_ = imported`
+   line (it only exists so the starter compiles with an unused variable).
+3. Build the receipt with `strconv.Itoa(messages)`, **not** `string(messages)`.
 
 ## Further reading
 

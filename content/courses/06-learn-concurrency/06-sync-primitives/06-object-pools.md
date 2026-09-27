@@ -70,7 +70,7 @@ explicit lifetime and capacity management, so this isn't a connection pool.
 
 ## Measure before adding one
 
-Compare representative benchmarks with `-benchmem`, then inspect a heap profile. A pool
+Compare representative benchmarks with `-benchmem`, then inspect a heap profile ([Learn Testing](/courses/learn-testing/coverage-and-tooling/profiling-with-pprof) covers both). A pool
 can retain oversized buffers after an unusually large receipt; consider discarding
 buffers above a chosen capacity instead of returning them. Resetting a buffer also
 doesn't securely erase its backing memory, so avoid pooling sensitive data without

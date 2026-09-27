@@ -134,7 +134,7 @@ A channel carries one type, so how does a generator report that `fetchPage` fail
 
 - Send a result struct: `chan Result` where `type Result struct { Item MenuItem; Err error }`.
 - Return a second value alongside the channel, like `func() error`, that the caller calls after the channel closes.
-- Use the error group you'll build at the end of this chapter.
+- Use the error group you'll build in the next chapter.
 
 ## Generators vs iterators
 

@@ -29,6 +29,85 @@ quiz:
       `for i := 0; i < n; i++` into `for i := range n`, or `interface{}`
       into `any`. It doesn't find bugs (that's closer to `go vet`) or
       format code (that's `go fmt`).
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"fmt"
+    	"strconv"
+    )
+
+    // receipt describes a batch of sent messages, e.g. "sent 3 messages for $0.05".
+    func receipt(sent int, dollars float64) string {
+    	return fmt.Sprintf("sent %s messages for $%d", sent, dollars)
+    }
+
+    // codeText builds a verification text, e.g. "Your code is 4821".
+    func codeText(code int) string {
+    	return "Your code is " + string(rune(code))
+    }
+
+    func main() {
+    	fmt.Println(receipt(3, 0.05))
+    	fmt.Println(codeText(4821))
+    	_ = strconv.Itoa // strconv is here for you to use
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"strconv"
+    )
+
+    func receipt(sent int, dollars float64) string {
+    	return fmt.Sprintf("sent %d messages for $%.2f", sent, dollars)
+    }
+
+    func codeText(code int) string {
+    	return "Your code is " + strconv.Itoa(code)
+    }
+
+    func main() {
+    	fmt.Println(receipt(3, 0.05))
+    	fmt.Println(codeText(4821))
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestReceipt(t *testing.T) {
+    	for _, tc := range []struct {
+    		sent    int
+    		dollars float64
+    		want    string
+    	}{
+    		{3, 0.05, "sent 3 messages for $0.05"},
+    		{120, 1.2, "sent 120 messages for $1.20"},
+    		{0, 0, "sent 0 messages for $0.00"},
+    	} {
+    		if got := receipt(tc.sent, tc.dollars); got != tc.want {
+    			t.Errorf("receipt(%d, %v) = %q, want %q", tc.sent, tc.dollars, got, tc.want)
+    		}
+    	}
+    }
+
+    func TestCodeText(t *testing.T) {
+    	for _, tc := range []struct {
+    		code int
+    		want string
+    	}{
+    		{4821, "Your code is 4821"},
+    		{65, "Your code is 65"},
+    		{7, "Your code is 7"},
+    	} {
+    		if got := codeText(tc.code); got != tc.want {
+    			t.Errorf("codeText(%d) = %q, want %q", tc.code, got, tc.want)
+    		}
+    	}
+    }
 ---
 
 Go ships with a toolbox built into the `go` command. Three tools keep your code tidy, correct and modern: `go fmt`, `go vet` and `go fix`.
@@ -144,6 +223,20 @@ $ go test ./...
 ```
 
 And every so often, especially after upgrading Go, run `go fix ./...` and review the diff. You'll learn about `go test` in the next chapter.
+
+## Your turn
+
+This code compiles, but `go vet` would complain about it, and the output is garbage.
+Press **Run** to see how `Printf`-style verbs report mistakes at runtime, like
+`%!s(int=3)`. (**Submit** runs `go test`, which runs `go vet`'s `printf` check first.)
+
+Fix both functions:
+
+1. In `receipt`, use `%d` for the count and `%.2f` for the dollars (two decimal
+   places), so `receipt(3, 0.05)` returns `sent 3 messages for $0.05`.
+2. In `codeText`, converting a number with `string(rune(code))` gives you a
+   *character*, not digits. Use `strconv.Itoa(code)` instead, and delete the
+   `_ = strconv.Itoa` line in `main`.
 
 ## Further reading
 

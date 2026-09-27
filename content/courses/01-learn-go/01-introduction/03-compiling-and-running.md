@@ -24,6 +24,29 @@ quiz:
       Along the way it checks things like types and names, so many bugs
       (such as a typo in a function name) are reported up front instead of
       in the middle of sending a customer's text messages.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    func main() {
+    	fmt.Println("Compiling Textio...")
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func main() {
+    	fmt.Println("Compiling Textio...")
+    	fmt.Println("Build complete!")
+    	fmt.Println("Textio server starting...")
+    }
+  expected_output: |
+    Compiling Textio...
+    Build complete!
+    Textio server starting...
 ---
 
 Computers don't understand Go. Deep down, a processor only understands **machine code**: long sequences of numbers that mean things like "add these two values" or "jump to this instruction". Somebody has to translate your Go into machine code. There are two main ways languages do this.
@@ -102,3 +125,20 @@ $ go run main.go
 The error tells you the file, the line (6) and the column (6), and what went wrong. Get used to reading these messages. They're the compiler being helpful, not rude.
 
 Go's compiler is strict in other ways too. It refuses to compile a program that imports a package it doesn't use, or declares a variable it never uses. That sounds fussy, but it keeps Go codebases tidy.
+
+## Your turn
+
+When you press **Run** or **Submit**, your program goes through exactly the steps in
+this lesson: it's compiled first, and only runs if compiling succeeds.
+
+Change the program so it prints these three lines, in this order:
+
+```text
+Compiling Textio...
+Build complete!
+Textio server starting...
+```
+
+Add one `fmt.Println` call per line. Capital letters and punctuation must match
+exactly. While you're here, try misspelling `Println` and pressing **Run** to see
+a real compile error, then fix it again.

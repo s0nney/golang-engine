@@ -99,6 +99,5 @@ Look at what you've built:
 - **Graphs** with BFS, DFS, cycle detection and Dijkstra to navigate the world map.
 - And the judgement to recognise when a problem has **no** efficient exact solution.
 
-Picking the right data structure is most of the battle in real software. You now have a
-full toolbox. Next up is [Learn Concurrency in Go](/courses/learn-concurrency), where you'll
-put all those cores to work.
+Picking the right data structure is most of the battle in real software. One job
+left: make several of them work together in the final practice lesson.

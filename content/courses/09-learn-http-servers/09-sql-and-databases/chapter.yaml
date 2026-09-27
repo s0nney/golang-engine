@@ -1,0 +1,2 @@
+title: SQL and Databases
+description: Learn enough SQL to be dangerous (and safe), then put Squeak's repository interface on top of a real relational database with database/sql, placeholders, transactions and migrations.

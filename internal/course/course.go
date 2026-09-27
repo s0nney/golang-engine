@@ -21,7 +21,23 @@ type Course struct {
 	Slug        string
 	Title       string
 	Description string
+	Beyond      bool // listed after the core roadmap ("track: beyond" in course.yaml)
 	Chapters    []Chapter
+	Problems    []Problem // standalone practice exercises, from the course's exercises/ directory
+}
+
+// Difficulties are the levels a Problem can have, easiest first.
+var Difficulties = []string{"easy", "medium", "hard"}
+
+// Problem is a standalone practice exercise, separate from the lessons.
+type Problem struct {
+	Slug       string
+	Title      string
+	Difficulty string   // one of Difficulties
+	After      string   // slug of the chapter it draws on, "" if none
+	HTML       string   // rendered problem statement
+	Hints      []string // rendered HTML, revealed one at a time
+	Exercise   *Exercise
 }
 
 type Chapter struct {
@@ -64,6 +80,7 @@ type Option struct {
 type courseMeta struct {
 	Title       string `yaml:"title"`
 	Description string `yaml:"description"`
+	Track       string `yaml:"track"` // courses only: "core" (the default) or "beyond"
 }
 
 type lessonMeta struct {
@@ -76,13 +93,26 @@ type lessonMeta struct {
 			Correct bool   `yaml:"correct"`
 		} `yaml:"options"`
 	} `yaml:"quiz"`
-	Exercise *struct {
-		Starter        string `yaml:"starter"`
-		Solution       string `yaml:"solution"`
-		Tests          string `yaml:"tests"`
-		ExpectedOutput string `yaml:"expected_output"`
-	} `yaml:"exercise"`
+	Exercise *exerciseMeta `yaml:"exercise"`
 }
+
+type exerciseMeta struct {
+	Starter        string `yaml:"starter"`
+	Solution       string `yaml:"solution"`
+	Tests          string `yaml:"tests"`
+	ExpectedOutput string `yaml:"expected_output"`
+}
+
+type problemMeta struct {
+	Title      string        `yaml:"title"`
+	Difficulty string        `yaml:"difficulty"`
+	After      string        `yaml:"after"`
+	Hints      []string      `yaml:"hints"`
+	Exercise   *exerciseMeta `yaml:"exercise"`
+}
+
+// problemsDir holds a course's practice problems; it isn't a chapter.
+const problemsDir = "exercises"
 
 var (
 	orderedName = regexp.MustCompile(`^(\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)$`)
@@ -119,8 +149,11 @@ func LoadCourse(fsys fs.FS, dir string) (Course, error) {
 	if err := readYAML(fsys, path.Join(dir, "course.yaml"), &meta); err != nil {
 		return Course{}, err
 	}
-	c := Course{Slug: slug(path.Base(dir)), Title: meta.Title, Description: meta.Description}
+	c := Course{Slug: slug(path.Base(dir)), Title: meta.Title, Description: meta.Description, Beyond: meta.Track == "beyond"}
 	var errs []error
+	if meta.Track != "" && meta.Track != "core" && meta.Track != "beyond" {
+		errs = append(errs, fmt.Errorf("%s/course.yaml: track must be core or beyond, not %q", dir, meta.Track))
+	}
 	for name := range orderedDirs(fsys, dir, &errs) {
 		ch, err := loadChapter(fsys, path.Join(dir, name))
 		if err != nil {
@@ -133,6 +166,13 @@ func LoadCourse(fsys fs.FS, dir string) (Course, error) {
 	if len(c.Chapters) == 0 {
 		errs = append(errs, fmt.Errorf("%s: course has no chapters", dir))
 	}
+	var chapters []string
+	for _, ch := range c.Chapters {
+		chapters = append(chapters, ch.Slug)
+	}
+	problems, err := loadProblems(fsys, path.Join(dir, problemsDir), chapters)
+	c.Problems = problems
+	errs = append(errs, err)
 	return c, errors.Join(errs...)
 }
 
@@ -198,15 +238,12 @@ func loadLesson(fsys fs.FS, file string) (Lesson, error) {
 	}
 
 	l := Lesson{Slug: slug(strings.TrimSuffix(path.Base(file), ".md")), Title: meta.Title, HTML: render(body)}
-	if e := meta.Exercise; e != nil {
-		hasTests, hasOutput := strings.TrimSpace(e.Tests) != "", strings.TrimSpace(e.ExpectedOutput) != ""
-		switch {
-		case strings.TrimSpace(e.Starter) == "" || strings.TrimSpace(e.Solution) == "":
-			errs = append(errs, errors.New("exercise needs a starter and a solution"))
-		case hasTests == hasOutput:
-			errs = append(errs, errors.New("exercise needs exactly one of tests or expected_output"))
+	if meta.Exercise != nil {
+		e, err := parseExercise(meta.Exercise)
+		if err != nil {
+			errs = append(errs, err)
 		}
-		l.Exercise = &Exercise{Starter: e.Starter, Solution: e.Solution, Tests: e.Tests, ExpectedOutput: e.ExpectedOutput}
+		l.Exercise = e
 	}
 	for i, q := range meta.Quiz {
 		correct := 0
@@ -240,6 +277,101 @@ func loadLesson(fsys fs.FS, file string) (Lesson, error) {
 		return Lesson{}, fmt.Errorf("%s: %w", file, err)
 	}
 	return l, nil
+}
+
+func parseExercise(e *exerciseMeta) (*Exercise, error) {
+	var err error
+	hasTests, hasOutput := strings.TrimSpace(e.Tests) != "", strings.TrimSpace(e.ExpectedOutput) != ""
+	switch {
+	case strings.TrimSpace(e.Starter) == "" || strings.TrimSpace(e.Solution) == "":
+		err = errors.New("exercise needs a starter and a solution")
+	case hasTests == hasOutput:
+		err = errors.New("exercise needs exactly one of tests or expected_output")
+	}
+	return &Exercise{Starter: e.Starter, Solution: e.Solution, Tests: e.Tests, ExpectedOutput: e.ExpectedOutput}, err
+}
+
+// loadProblems reads the NN-slug.md files in a course's exercises/
+// directory, if it has one. chapters are the course's chapter slugs, which
+// a problem's after field must name.
+func loadProblems(fsys fs.FS, dir string, chapters []string) ([]Problem, error) {
+	entries, err := fs.ReadDir(fsys, dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var (
+		problems []Problem
+		errs     []error
+	)
+	for _, e := range entries {
+		name, ok := strings.CutSuffix(e.Name(), ".md")
+		if e.IsDir() || !ok {
+			continue
+		}
+		file := path.Join(dir, e.Name())
+		if !orderedName.MatchString(name) {
+			errs = append(errs, fmt.Errorf("%s: problem file must be named NN-slug.md", file))
+			continue
+		}
+		p, err := loadProblem(fsys, file, chapters)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", file, err))
+			continue
+		}
+		problems = append(problems, p)
+	}
+	return problems, errors.Join(errs...)
+}
+
+func loadProblem(fsys fs.FS, file string, chapters []string) (Problem, error) {
+	raw, err := fs.ReadFile(fsys, file)
+	if err != nil {
+		return Problem{}, err
+	}
+	front, body, err := splitFrontmatter(raw)
+	if err != nil {
+		return Problem{}, err
+	}
+	var meta problemMeta
+	if err := yaml.Unmarshal(front, &meta); err != nil {
+		return Problem{}, fmt.Errorf("frontmatter: %w", err)
+	}
+	var errs []error
+	if strings.TrimSpace(meta.Title) == "" {
+		errs = append(errs, errors.New("missing title"))
+	}
+	if len(bytes.TrimSpace(body)) == 0 {
+		errs = append(errs, errors.New("empty problem statement"))
+	}
+	if !slices.Contains(Difficulties, meta.Difficulty) {
+		errs = append(errs, fmt.Errorf("difficulty must be easy, medium or hard, not %q", meta.Difficulty))
+	}
+	if meta.After != "" && !slices.Contains(chapters, meta.After) {
+		errs = append(errs, fmt.Errorf("after: no chapter %q in this course", meta.After))
+	}
+	p := Problem{
+		Slug:       slug(strings.TrimSuffix(path.Base(file), ".md")),
+		Title:      meta.Title,
+		Difficulty: meta.Difficulty,
+		After:      meta.After,
+		HTML:       render(body),
+	}
+	for i, h := range meta.Hints {
+		if strings.TrimSpace(h) == "" {
+			errs = append(errs, fmt.Errorf("hints[%d]: empty", i))
+		}
+		p.Hints = append(p.Hints, render([]byte(h)))
+	}
+	if meta.Exercise == nil {
+		errs = append(errs, errors.New("problem needs an exercise"))
+	} else {
+		p.Exercise, err = parseExercise(meta.Exercise)
+		errs = append(errs, err)
+	}
+	return p, errors.Join(errs...)
 }
 
 // splitFrontmatter separates a leading "---" delimited YAML block from the body.
@@ -280,7 +412,7 @@ func orderedDirs(fsys fs.FS, dir string, errs *[]error) func(func(string) bool) 
 		}
 		names := make([]string, 0, len(entries))
 		for _, e := range entries {
-			if !e.IsDir() {
+			if !e.IsDir() || e.Name() == problemsDir {
 				continue
 			}
 			if !orderedName.MatchString(e.Name()) {

@@ -34,6 +34,95 @@ quiz:
     explanation: |
       Both `"# Intro"` and `"## Setup"` start with `#`, so the counter ends at 2.
       This is imperative code: you manage the counter yourself.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // isTodo reports whether line, ignoring leading whitespace, starts with "TODO:".
+    func isTodo(line string) bool {
+    	// ?
+    	return false
+    }
+
+    // hasTodo reports whether any line is a TODO.
+    // Write it declaratively: one call to slices.ContainsFunc.
+    func hasTodo(lines []string) bool {
+    	// ?
+    	return false
+    }
+
+    func main() {
+    	draft := []string{"# Release notes", "", "  TODO: add the date", "Fixed the PDF bug."}
+    	final := []string{"# Release notes", "Fixed the PDF bug.", "todo: nothing"}
+    	fmt.Println(hasTodo(draft)) // should print true
+    	fmt.Println(hasTodo(final)) // should print false
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"slices"
+    	"strings"
+    )
+
+    // isTodo reports whether line, ignoring leading whitespace, starts with "TODO:".
+    func isTodo(line string) bool {
+    	return strings.HasPrefix(strings.TrimSpace(line), "TODO:")
+    }
+
+    // hasTodo reports whether any line is a TODO.
+    func hasTodo(lines []string) bool {
+    	return slices.ContainsFunc(lines, isTodo)
+    }
+
+    func main() {
+    	draft := []string{"# Release notes", "", "  TODO: add the date", "Fixed the PDF bug."}
+    	final := []string{"# Release notes", "Fixed the PDF bug.", "todo: nothing"}
+    	fmt.Println(hasTodo(draft))
+    	fmt.Println(hasTodo(final))
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestIsTodo(t *testing.T) {
+    	for _, tt := range []struct {
+    		line string
+    		want bool
+    	}{
+    		{"TODO: write intro", true},
+    		{"   TODO: indented", true},
+    		{"\tTODO: tabbed", true},
+    		{"todo: lowercase", false},
+    		{"TODO without colon", false},
+    		{"Remember the TODO: list", false},
+    		{"", false},
+    	} {
+    		if got := isTodo(tt.line); got != tt.want {
+    			t.Errorf("isTodo(%q) = %v, want %v", tt.line, got, tt.want)
+    		}
+    	}
+    }
+
+    func TestHasTodo(t *testing.T) {
+    	for _, tt := range []struct {
+    		lines []string
+    		want  bool
+    	}{
+    		{[]string{"# Notes", "  TODO: date"}, true},
+    		{[]string{"TODO: first", "done"}, true},
+    		{[]string{"# Notes", "all done"}, false},
+    		{nil, false},
+    	} {
+    		if got := hasTodo(tt.lines); got != tt.want {
+    			t.Errorf("hasTodo(%q) = %v, want %v", tt.lines, got, tt.want)
+    		}
+    	}
+    }
 ---
 
 There are two broad ways to tell a computer what to do.
@@ -126,3 +215,12 @@ readable thing you can write. Declarative style shines when a well-named helper
 (`slices.ContainsFunc`, `strings.Fields`, `slices.SortFunc`) already expresses your
 intent. Reach for it when it makes the code *say what it means*, not just to look
 clever.
+
+## Your turn
+
+Doc2Doc refuses to publish a draft that still has TODO notes in it.
+
+1. Complete `isTodo(line)`: it reports whether the line, ignoring leading whitespace, starts with `TODO:` (uppercase, with the colon).
+2. Complete `hasTodo(lines)` declaratively: a single call to `slices.ContainsFunc`, passing `isTodo` itself.
+
+You'll need to import `slices` and `strings`.

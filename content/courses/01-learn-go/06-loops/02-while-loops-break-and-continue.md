@@ -42,6 +42,64 @@ quiz:
     explanation: |
       A `for` with nothing after it loops forever. Go has no `while` or
       `loop` keyword. Use `break` or `return` to get out.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // affordable returns how many messages costing cost credits each
+    // can be sent with the given credits.
+    func affordable(credits, cost int) int {
+    	sent := 0
+    	// ?
+    	return sent
+    }
+
+    func main() {
+    	fmt.Println(affordable(10, 3))
+    	fmt.Println(affordable(2, 5))
+    	fmt.Println(affordable(10, 0))
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func affordable(credits, cost int) int {
+    	sent := 0
+    	if cost <= 0 {
+    		return sent
+    	}
+    	for credits >= cost {
+    		credits -= cost
+    		sent++
+    	}
+    	return sent
+    }
+
+    func main() {
+    	fmt.Println(affordable(10, 3))
+    	fmt.Println(affordable(2, 5))
+    	fmt.Println(affordable(10, 0))
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestAffordable(t *testing.T) {
+    	for _, tc := range []struct {
+    		credits, cost, want int
+    	}{
+    		{10, 3, 3}, {9, 3, 3}, {2, 5, 0}, {5, 5, 1}, {0, 1, 0}, {100, 1, 100},
+    		{10, 0, 0}, {10, -2, 0},
+    	} {
+    		if got := affordable(tc.credits, tc.cost); got != tc.want {
+    			t.Errorf("affordable(%d, %d) = %d, want %d", tc.credits, tc.cost, got, tc.want)
+    		}
+    	}
+    }
 ---
 
 Sometimes you don't know in advance how many times to loop. You just want to keep going **while** something is true. Other languages have a `while` keyword for that. Go just uses `for` again.
@@ -193,6 +251,16 @@ for { }                    // infinite loop
 ```
 
 And later you'll use `for ... range` to loop over lists and maps. One keyword, many shapes.
+
+## Your turn
+
+Complete `affordable` using a condition-only `for` loop, like the first example in
+this lesson: while there are enough credits for another message, spend them and
+count one more message sent. Return the count.
+
+There's a trap: if `cost` is `0` (or negative), `credits >= cost` never becomes
+false and your loop runs **forever**. Check for that *before* the loop and return
+`0`. **Run** should print `3`, `0` and `0`.
 
 ## Further reading
 

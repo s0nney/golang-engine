@@ -35,6 +35,172 @@ quiz:
       Only the first iteration sees shuffled input. Every later one
       measures the (often much faster) already-sorted case. Copy fresh
       input each iteration, or measure the copy separately and subtract it.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"cmp"
+    	"flag"
+    	"fmt"
+    	"slices"
+    	"testing"
+    )
+
+    // BenchmarkSortByDate should measure sortByDate on unsorted input, every
+    // iteration. Fix it.
+    func BenchmarkSortByDate(b *testing.B) {
+    	for b.Loop() {
+    		sortByDate(sample)
+    	}
+    }
+
+    // ---- Ledgerly code ----
+
+    // Txn is a transaction on a given day of the month.
+    type Txn struct {
+    	Day   int
+    	Cents int64
+    }
+
+    // sample is shared by every benchmark in the package: 500 transactions
+    // in no particular order. Benchmarks must not modify it.
+    var sample = makeSample(500)
+
+    func makeSample(n int) []Txn {
+    	txns := make([]Txn, n)
+    	for i := range txns {
+    		txns[i] = Txn{Day: i * 7919 % n, Cents: int64(i)}
+    	}
+    	return txns
+    }
+
+    func byDay(a, b Txn) int { return cmp.Compare(a.Day, b.Day) }
+
+    // sortByDate sorts txns in place by day. It's a variable so that tests
+    // can wrap it with a spy.
+    var sortByDate = func(txns []Txn) {
+    	slices.SortFunc(txns, byDay)
+    }
+
+    func main() {
+    	testing.Init()
+    	flag.Set("test.benchtime", "2000x") // keep Run quick
+    	r := testing.Benchmark(BenchmarkSortByDate)
+    	fmt.Println("BenchmarkSortByDate:", r)
+    	fmt.Println("sample still unsorted:", !slices.IsSortedFunc(sample, byDay))
+    }
+  solution: |
+    package main
+
+    import (
+    	"cmp"
+    	"flag"
+    	"fmt"
+    	"slices"
+    	"testing"
+    )
+
+    // BenchmarkSortByDate measures sortByDate on unsorted input, every
+    // iteration. Cloning is part of the measurement, which is fine for
+    // comparing sort implementations, since they all pay for it.
+    func BenchmarkSortByDate(b *testing.B) {
+    	for b.Loop() {
+    		txns := slices.Clone(sample)
+    		sortByDate(txns)
+    	}
+    }
+
+    // ---- Ledgerly code ----
+
+    // Txn is a transaction on a given day of the month.
+    type Txn struct {
+    	Day   int
+    	Cents int64
+    }
+
+    // sample is shared by every benchmark in the package: 500 transactions
+    // in no particular order. Benchmarks must not modify it.
+    var sample = makeSample(500)
+
+    func makeSample(n int) []Txn {
+    	txns := make([]Txn, n)
+    	for i := range txns {
+    		txns[i] = Txn{Day: i * 7919 % n, Cents: int64(i)}
+    	}
+    	return txns
+    }
+
+    func byDay(a, b Txn) int { return cmp.Compare(a.Day, b.Day) }
+
+    // sortByDate sorts txns in place by day. It's a variable so that tests
+    // can wrap it with a spy.
+    var sortByDate = func(txns []Txn) {
+    	slices.SortFunc(txns, byDay)
+    }
+
+    func main() {
+    	testing.Init()
+    	flag.Set("test.benchtime", "2000x") // keep Run quick
+    	r := testing.Benchmark(BenchmarkSortByDate)
+    	fmt.Println("BenchmarkSortByDate:", r)
+    	fmt.Println("sample still unsorted:", !slices.IsSortedFunc(sample, byDay))
+    }
+  tests: |
+    package main
+
+    import (
+    	"flag"
+    	"slices"
+    	"testing"
+    )
+
+    func runBenchmark(t *testing.T, iterations string) {
+    	t.Helper()
+    	if err := flag.Set("test.benchtime", iterations); err != nil {
+    		t.Fatal(err)
+    	}
+    	testing.Benchmark(BenchmarkSortByDate)
+    }
+
+    func TestSampleUntouched(t *testing.T) {
+    	orig := makeSample(500)
+    	if !slices.Equal(sample, orig) {
+    		t.Fatal("sample was already modified before the benchmark ran; don't change makeSample or sample")
+    	}
+    	runBenchmark(t, "50x")
+    	if !slices.Equal(sample, orig) {
+    		t.Error("after running BenchmarkSortByDate, sample has changed: the benchmark must not sort the shared sample in place (other benchmarks use it too)")
+    	}
+    	t.Cleanup(func() { sample = orig })
+    }
+
+    func TestEveryIterationSortsUnsortedInput(t *testing.T) {
+    	sortFn := sortByDate
+    	t.Cleanup(func() { sortByDate = sortFn })
+    	calls, sortedInputs, wrongLen := 0, 0, 0
+    	sortByDate = func(txns []Txn) {
+    		calls++
+    		if slices.IsSortedFunc(txns, byDay) {
+    			sortedInputs++
+    		}
+    		if len(txns) != len(sample) {
+    			wrongLen++
+    		}
+    		sortFn(txns)
+    	}
+    	sample = makeSample(500)
+    	runBenchmark(t, "100x")
+    	if calls < 100 {
+    		t.Fatalf("with -benchtime=100x, sortByDate was called %d times, want at least 100: call it inside the b.Loop() loop", calls)
+    	}
+    	if sortedInputs > 0 {
+    		t.Errorf("%d of %d calls to sortByDate got already-sorted input: every iteration needs a fresh unsorted copy of sample", sortedInputs, calls)
+    	}
+    	if wrongLen > 0 {
+    		t.Errorf("%d of %d calls to sortByDate got a slice whose length isn't len(sample) = %d", wrongLen, calls, len(sample))
+    	}
+    }
 ---
 
 Benchmarks are experiments, and experiments can be done badly. This lesson is about getting numbers you can trust.
@@ -103,13 +269,21 @@ for b.Loop() {
 
 The clone is now part of the measurement, which is often fine for comparing two sort implementations, since both pay the same cost.
 
+## Your turn: fix a lying benchmark
+
+`BenchmarkSortByDate` in the editor has the bug from the quiz. It sorts the shared `sample` in place, so only the first iteration sorts anything, and every other benchmark in the package now gets sorted data too.
+
+Fix the benchmark so that **every iteration sorts a fresh, unsorted copy** and `sample` is never modified. Keep the `for b.Loop()` loop and the call to `sortByDate`.
+
+The grader wraps `sortByDate` in a spy that records whether each call receives already-sorted input, and checks `sample` after the benchmark runs. Cloning once *before* the loop isn't enough: the second iteration would sort the already-sorted clone. **Run** prints the benchmark result and whether `sample` survived. Watch the ns/op jump once the benchmark measures real work.
+
 ## Pitfall 4: unrealistic inputs
 
 A benchmark with 10 transactions tells you nothing about a 10-million-row import. Tiny inputs fit in the CPU cache, and algorithmic problems (an accidental O(n²)) don't show. Benchmark with sizes like the real ones, and several sizes where you can, as with the sub-benchmarks in the first lesson.
 
 ## Pitfall 5: optimising what doesn't matter
 
-A benchmark tells you how fast one function is, not whether it matters. Making `Cents.String` nine times faster is pointless if the import spends 95% of its time reading the disk. Profile the real workload first (chapter 9 covers `pprof`), find the hot spot, *then* benchmark and optimise that.
+A benchmark tells you how fast one function is, not whether it matters. Making `Cents.String` nine times faster is pointless if the import spends 95% of its time reading the disk. Profile the real workload first (the Coverage and Tooling chapter covers `pprof`), find the hot spot, *then* benchmark and optimise that.
 
 ## Custom metrics
 

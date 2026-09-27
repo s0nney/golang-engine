@@ -51,6 +51,94 @@ quiz:
       A buffer of 2 lets both sends complete without a receiver. `len` is the
       number of values waiting (2) and `cap` is the buffer size (2). Channels
       are first in, first out, so the receive gets `1`.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    func segments(body string) int {
+    	return (len(body) + 159) / 160
+    }
+
+    // totalSegments measures every body in its own goroutine and adds up
+    // the results it receives from a channel.
+    func totalSegments(bodies []string) int {
+    	counts := make(chan int)
+    	for _, b := range bodies {
+    		go func() {
+    			counts <- segments(b)
+    		}()
+    	}
+    	total := 0
+    	// ?
+    	return total
+    }
+
+    func main() {
+    	fmt.Println(totalSegments([]string{"hi", "ok", string(make([]byte, 200))}))
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func segments(body string) int {
+    	return (len(body) + 159) / 160
+    }
+
+    func totalSegments(bodies []string) int {
+    	counts := make(chan int)
+    	for _, b := range bodies {
+    		go func() {
+    			counts <- segments(b)
+    		}()
+    	}
+    	total := 0
+    	for range bodies {
+    		total += <-counts
+    	}
+    	return total
+    }
+
+    func main() {
+    	fmt.Println(totalSegments([]string{"hi", "ok", string(make([]byte, 200))}))
+    }
+  tests: |
+    package main
+
+    import (
+    	"runtime"
+    	"strings"
+    	"testing"
+    	"time"
+    )
+
+    func TestTotalSegments(t *testing.T) {
+    	for _, tc := range []struct {
+    		bodies []string
+    		want   int
+    	}{
+    		{[]string{"hi", "ok", strings.Repeat("x", 200)}, 4},
+    		{[]string{strings.Repeat("x", 480), strings.Repeat("x", 481)}, 7},
+    		{[]string{"one"}, 1},
+    		{nil, 0},
+    	} {
+    		if got := totalSegments(tc.bodies); got != tc.want {
+    			t.Errorf("totalSegments(%d bodies) = %d, want %d", len(tc.bodies), got, tc.want)
+    		}
+    	}
+    }
+
+    func TestNoLeakedGoroutines(t *testing.T) {
+    	before := runtime.NumGoroutine()
+    	bodies := make([]string, 50)
+    	totalSegments(bodies)
+    	time.Sleep(50 * time.Millisecond)
+    	if after := runtime.NumGoroutine(); after > before {
+    		t.Errorf("%d goroutines are still blocked after totalSegments returned; receive once per body", after-before)
+    	}
+    }
 ---
 
 Goroutines run independently. **Channels** are how they talk to each other: one goroutine sends a value into a channel, and another receives it. Go's motto is:
@@ -193,6 +281,15 @@ func deliver(to string, results chan<- string) { // may only send
 	results <- "delivered to " + to
 }
 ```
+
+## Your turn
+
+`totalSegments` already starts one goroutine per message body, and each one sends
+its segment count into `counts`. But nobody receives, so the result is always `0`
+and every goroutine is stuck forever on its send.
+
+Receive **once per body** (a `for range bodies` loop works well) and add each value
+to `total`. **Run** should print `4`.
 
 ## Further reading
 

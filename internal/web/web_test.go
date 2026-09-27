@@ -78,6 +78,29 @@ exercise:
 Write add.
 `
 
+const printSixProblem = `---
+title: Print Six
+difficulty: easy
+after: intro
+hints:
+  - Use **fmt.Println**.
+  - 'Print 6.'
+exercise:
+  starter: |
+    package main
+
+    func main() {}
+  solution: |
+    package main
+
+    import "fmt"
+
+    func main() { fmt.Println(6) }
+  expected_output: "6"
+---
+Print the number six.
+`
+
 func newTestApp(t *testing.T, run *runner.Runner) *fiber.App {
 	t.Helper()
 	fsys := fstest.MapFS{
@@ -87,6 +110,11 @@ func newTestApp(t *testing.T, run *runner.Runner) *fiber.App {
 		"courses/01-demo/01-intro/02-hello-again.md": {Data: []byte(strings.Replace(lessonMD, "title: Hello", "title: Hello Again", 1))},
 		"courses/01-demo/01-intro/03-print-it.md":    {Data: []byte(outputExercise)},
 		"courses/01-demo/01-intro/04-add.md":         {Data: []byte(testsExercise)},
+		"courses/01-demo/exercises/01-print-six.md":  {Data: []byte(printSixProblem)},
+		"courses/01-demo/exercises/02-hard-thing.md": {Data: []byte(strings.NewReplacer("title: Print Six", "title: Hard Thing", "difficulty: easy", "difficulty: hard").Replace(printSixProblem))},
+		"courses/02-next/course.yaml":                {Data: []byte("title: Next Up\ntrack: beyond\n")},
+		"courses/02-next/01-start/chapter.yaml":      {Data: []byte("title: Start\n")},
+		"courses/02-next/01-start/01-first.md":       {Data: []byte(strings.Replace(lessonMD, "title: Hello", "title: First Steps", 1))},
 	}
 	courses, err := course.Load(fsys, "courses")
 	if err != nil {
@@ -149,7 +177,7 @@ func TestPages(t *testing.T) {
 	}{
 		{"/", 200, "Demo"},
 		{"/courses/demo", 200, "Start course →"},
-		{"/courses/demo/intro/hello", 200, "Hello Again →"},
+		{"/courses/demo/intro/hello", 200, "Hello Again"},
 		{"/courses/demo/intro/print-it", 200, `<textarea id="code"`},
 		{"/courses/demo/intro/nope", 404, "doesn't exist"},
 		{"/courses/nope", 404, "doesn't exist"},
@@ -312,5 +340,131 @@ func TestBrowserTimezone(t *testing.T) {
 		if string(body) != tc.want {
 			t.Errorf("timezone %q = %q, want %q", tc.cookie, body, tc.want)
 		}
+	}
+}
+
+// Every lesson links to its neighbours, crossing into the next or previous
+// course at the edges, so learners can page through the whole roadmap.
+func TestLessonNavigation(t *testing.T) {
+	b := &browser{t: t, app: newTestApp(t, nil)}
+	tests := []struct {
+		path       string
+		want, deny []string
+	}{
+		{"/courses/demo/intro/hello",
+			[]string{`href="/courses/demo/intro/hello-again" rel="next"`, "Next lesson", "Hello Again"},
+			[]string{`rel="prev"`}},
+		{"/courses/demo/intro/print-it",
+			[]string{`href="/courses/demo/intro/hello-again" rel="prev"`, `href="/courses/demo/intro/add" rel="next"`},
+			nil},
+		{"/courses/demo/intro/add",
+			[]string{`href="/courses/next/start/first" rel="next"`, "Next course: Next Up"},
+			[]string{"Next lesson"}},
+		{"/courses/next/start/first",
+			[]string{`href="/courses/demo/intro/add" rel="prev"`, "Previous course: Demo", `href="/"`, "Back to the roadmap"},
+			[]string{`rel="next"`}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			_, body := b.do("GET", tt.path, nil, false)
+			for _, w := range tt.want {
+				if !strings.Contains(body, w) {
+					t.Errorf("GET %s: missing %q", tt.path, w)
+				}
+			}
+			for _, d := range tt.deny {
+				if strings.Contains(body, d) {
+					t.Errorf("GET %s: unexpected %q", tt.path, d)
+				}
+			}
+		})
+	}
+}
+
+// Courses marked "track: beyond" are listed after the core roadmap under their
+// own heading, with numbering that carries on from the core list.
+func TestRoadmapTracks(t *testing.T) {
+	b := &browser{t: t, app: newTestApp(t, nil)}
+	_, body := b.do("GET", "/", nil, false)
+	core, beyond := strings.Index(body, ">Demo<"), strings.Index(body, ">Next Up<")
+	heading := strings.Index(body, "Beyond the core</h2>")
+	if core < 0 || beyond < 0 || heading < 0 || !(core < heading && heading < beyond) {
+		t.Fatalf("want Demo, then the Beyond the core heading, then Next Up; indexes %d, %d, %d", core, heading, beyond)
+	}
+	if !strings.Contains(body, `<ol class="roadmap" start="2">`) {
+		t.Error(`beyond list should continue numbering with start="2"`)
+	}
+}
+
+func TestExercisesPage(t *testing.T) {
+	b := &browser{t: t, app: newTestApp(t, nil)}
+	tests := []struct {
+		path       string
+		code       int
+		want, deny []string
+	}{
+		{"/", 200, []string{`href="/exercises"`}, nil},
+		{"/exercises", 200,
+			[]string{"Print Six", "Hard Thing", `href="/exercises/demo/print-six"`, "badge easy", "badge hard", "Intro", "Easy 0/1"},
+			nil},
+		{"/exercises?level=hard", 200, []string{"Hard Thing"}, []string{"Print Six"}},
+		{"/exercises?course=next", 200, []string{"No exercises match"}, []string{"Print Six"}},
+		{"/exercises/demo/print-six", 200,
+			[]string{"Print the number six.", "Hint 1", "<strong>fmt.Println</strong>", "Hint 2", `<textarea id="code"`, `href="/courses/demo#intro"`, `href="/exercises/demo/hard-thing" rel="next"`},
+			[]string{"fmt.Println(6)"}}, // never leak the solution
+		{"/exercises/demo/nope", 404, []string{"doesn't exist"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			code, body := b.do("GET", tt.path, nil, false)
+			if code != tt.code {
+				t.Fatalf("GET %s = %d, want %d", tt.path, code, tt.code)
+			}
+			for _, w := range tt.want {
+				if !strings.Contains(body, w) {
+					t.Errorf("GET %s: missing %q", tt.path, w)
+				}
+			}
+			for _, d := range tt.deny {
+				if strings.Contains(body, d) {
+					t.Errorf("GET %s: unexpected %q", tt.path, d)
+				}
+			}
+		})
+	}
+}
+
+func TestSolvingProblems(t *testing.T) {
+	if testing.Short() {
+		t.Skip("compiles Go programs")
+	}
+	run, err := runner.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := &browser{t: t, app: newTestApp(t, run)}
+	const path = "/exercises/demo/print-six"
+	send := func(action, code string) string {
+		_, body := b.do("POST", path, url.Values{"action": {action}, "code": {code}}, true)
+		return body
+	}
+	if body := send("submit", "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(5) }\n"); !strings.Contains(body, "Not quite") {
+		t.Fatalf("wrong answer: %s", body)
+	}
+	body := send("submit", "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println(6) }\n")
+	if !strings.Contains(body, "Passed.") || !strings.Contains(body, "Next exercise →") || !strings.Contains(body, `hx-swap-oob="true"><span class="done">✓ Solved`) {
+		t.Fatalf("right answer: %s", body)
+	}
+	if _, body := b.do("GET", "/exercises", nil, false); !strings.Contains(body, "Easy 1/1") {
+		t.Errorf("list should count the solved problem:\n%s", body)
+	}
+	if _, body := b.do("GET", path, nil, false); !strings.Contains(body, "✓ Solved") || !strings.Contains(body, "fmt.Println(6)") {
+		t.Errorf("problem page should show solved status and the saved code")
+	}
+	if _, body := b.do("GET", "/", nil, false); !strings.Contains(body, "<dd>1<span> completed") {
+		t.Errorf("a solved problem should count toward today's activity")
+	}
+	if body := send("reset", ""); !strings.Contains(body, "func main() {}") || strings.Contains(body, "<html") {
+		t.Errorf("reset should return the starter panel fragment:\n%s", body)
 	}
 }

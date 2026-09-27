@@ -37,6 +37,126 @@ quiz:
     explanation: |
       `surround` itself has type `func(string, string) func(string) string`. Calling
       it returns its result type, a `func(string) string`.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // surround returns a function that wraps its argument in left and right.
+    func surround(left, right string) func(string) string {
+    	// ?
+    	return nil
+    }
+
+    // emphasis returns the function that makes text stand out in format:
+    //
+    //	"markdown" -> **text**
+    //	"html"     -> <strong>text</strong>
+    //	"text"     -> TEXT (upper case)
+    //
+    // Any other format returns a nil function and the error
+    // `unknown format "<format>"`.
+    func emphasis(format string) (func(string) string, error) {
+    	// ?
+    	return nil, nil
+    }
+
+    func main() {
+    	for _, format := range []string{"markdown", "html", "text", "pdf"} {
+    		bold, err := emphasis(format)
+    		if err != nil || bold == nil {
+    			fmt.Println("error:", err, "(or no function)")
+    			continue
+    		}
+    		fmt.Println(bold("warning"))
+    	}
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"strings"
+    )
+
+    func surround(left, right string) func(string) string {
+    	return func(s string) string {
+    		return left + s + right
+    	}
+    }
+
+    func emphasis(format string) (func(string) string, error) {
+    	switch format {
+    	case "markdown":
+    		return surround("**", "**"), nil
+    	case "html":
+    		return surround("<strong>", "</strong>"), nil
+    	case "text":
+    		return strings.ToUpper, nil
+    	default:
+    		return nil, fmt.Errorf("unknown format %q", format)
+    	}
+    }
+
+    func main() {
+    	for _, format := range []string{"markdown", "html", "text", "pdf"} {
+    		bold, err := emphasis(format)
+    		if err != nil {
+    			fmt.Println("error:", err)
+    			continue
+    		}
+    		fmt.Println(bold("warning"))
+    	}
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestSurround(t *testing.T) {
+    	for _, tt := range []struct{ l, r, in, want string }{
+    		{"**", "**", "hi", "**hi**"},
+    		{"`", "`", "go run", "`go run`"},
+    		{"(", ")", "", "()"},
+    	} {
+    		f := surround(tt.l, tt.r)
+    		if f == nil {
+    			t.Fatalf("surround(%q, %q) returned nil", tt.l, tt.r)
+    		}
+    		if got := f(tt.in); got != tt.want {
+    			t.Errorf("surround(%q, %q)(%q) = %q, want %q", tt.l, tt.r, tt.in, got, tt.want)
+    		}
+    	}
+    }
+
+    func TestEmphasis(t *testing.T) {
+    	for _, tt := range []struct{ format, in, want string }{
+    		{"markdown", "warning", "**warning**"},
+    		{"html", "warning", "<strong>warning</strong>"},
+    		{"text", "warning", "WARNING"},
+    		{"html", "a & b", "<strong>a & b</strong>"},
+    	} {
+    		f, err := emphasis(tt.format)
+    		if err != nil || f == nil {
+    			t.Errorf("emphasis(%q) = (func %v, %v), want a function and nil error", tt.format, f != nil, err)
+    			continue
+    		}
+    		if got := f(tt.in); got != tt.want {
+    			t.Errorf("emphasis(%q)(%q) = %q, want %q", tt.format, tt.in, got, tt.want)
+    		}
+    	}
+    	for _, format := range []string{"pdf", "", "HTML"} {
+    		f, err := emphasis(format)
+    		if f != nil {
+    			t.Errorf("emphasis(%q) returned a function, want nil", format)
+    		}
+    		want := `unknown format "` + format + `"`
+    		if err == nil || err.Error() != want {
+    			t.Errorf("emphasis(%q) error = %v, want %s", format, err, want)
+    		}
+    	}
+    }
 ---
 
 You've passed functions *into* functions. Now let's go the other way: functions that
@@ -135,3 +255,10 @@ func surround(left, right string) Transform
 ```
 
 Much easier on the eyes.
+
+## Your turn
+
+Doc2Doc needs one "make this stand out" function per output format, chosen once from a flag.
+
+1. Complete `surround(left, right)`, the factory from the top of this lesson.
+2. Complete `emphasis(format)`. For `"markdown"` return `surround("**", "**")`, for `"html"` return `surround("<strong>", "</strong>")`, and for `"text"` return `strings.ToUpper` itself (it already has the right type). Any other format returns `nil` and an error reading `unknown format "pdf"` (use `%q`).

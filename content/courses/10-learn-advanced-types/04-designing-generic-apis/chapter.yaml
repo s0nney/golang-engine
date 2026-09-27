@@ -1,0 +1,2 @@
+title: Designing Generic APIs
+description: Zero values and comma-ok results, the pointer-method constraint pattern, generic types with methods, choosing between Go 1.27 generic methods and functions, and API ergonomics.

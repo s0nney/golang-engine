@@ -1,0 +1,3 @@
+title: Learn Generics and Advanced Types in Go
+description: Go deeper into Go's type system. Type identity, type sets and constraints, inference, generic API design, interfaces in depth, reflection, and what generics cost and can't do, all while building Stash, a small generic collections library.
+track: beyond

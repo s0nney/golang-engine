@@ -152,4 +152,4 @@ sometimes skips the call.
 `truncate(12, skipEmpty(toHeading))` and `skipEmpty(truncate(12, toHeading))` behave
 slightly differently, because the outer wrapper runs first on the way in and last on
 the way out. Picture each wrapper as a layer of an onion around the original function.
-You'll see this again with HTTP middleware.
+You'll see this again with middleware later in this chapter.

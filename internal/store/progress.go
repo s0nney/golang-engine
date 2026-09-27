@@ -134,5 +134,8 @@ func (s *Store) ResetProgress(ctx context.Context, session string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM activity WHERE session = ?`, session); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM practice WHERE session = ?`, session); err != nil {
+		return err
+	}
 	return tx.Commit()
 }

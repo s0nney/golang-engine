@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 )
 
@@ -10,12 +11,41 @@ const activitySchema = `
 CREATE TABLE IF NOT EXISTS activity (
  session TEXT NOT NULL,
  day TEXT NOT NULL,
- kind TEXT NOT NULL CHECK (kind IN ('lesson', 'exercise')),
+ kind TEXT NOT NULL CHECK (kind IN ('lesson', 'exercise', 'practice')),
  course TEXT NOT NULL,
  chapter TEXT NOT NULL,
  lesson TEXT NOT NULL,
  PRIMARY KEY (session, day, kind, course, chapter, lesson)
 );`
+
+// migrateActivity upgrades an activity table created before practice
+// problems existed. SQLite can't alter a CHECK constraint, so the table is
+// rebuilt with the current schema and its rows copied across.
+func migrateActivity(db *sql.DB) error {
+	var ddl string
+	if err := db.QueryRow(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'activity'`).Scan(&ddl); err != nil {
+		return err
+	}
+	if strings.Contains(ddl, "'practice'") {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, stmt := range []string{
+		`ALTER TABLE activity RENAME TO activity_old`,
+		activitySchema,
+		`INSERT INTO activity SELECT session, day, kind, course, chapter, lesson FROM activity_old`,
+		`DROP TABLE activity_old`,
+	} {
+		if _, err := tx.Exec(stmt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
 
 // ActivityDay is a calendar day, including empty days in the heatmap.
 type ActivityDay struct {

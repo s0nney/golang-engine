@@ -1,0 +1,3 @@
+title: Learn Cryptography in Go
+description: Build Keybox, a small end-to-end-encrypted secrets vault, and learn the primitives behind it properly. Randomness, hashes, MACs, key derivation, authenticated encryption, key exchange, post-quantum KEMs, signatures and TLS, all with Go's standard library.
+track: beyond

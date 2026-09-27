@@ -1,0 +1,2 @@
+title: Generics Performance and Limits
+description: How Go compiles generic code with GC shapes and dictionaries, measuring generic versus interface versus concrete code with b.Loop, the things generics can't express, and a glimpse of unsafe.

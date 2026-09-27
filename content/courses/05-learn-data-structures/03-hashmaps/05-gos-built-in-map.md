@@ -32,17 +32,151 @@ quiz:
       Go deliberately randomises where each map iteration starts, so even two loops
       over an unchanged map can differ. If you need an order, sort the keys, for
       example with `slices.Sorted(maps.Keys(m))`.
-  - question: In Go's Swiss-table map, what's stored in each byte of a group's control word?
-    options:
-      - text: The full 64-bit hash of the slot's key
-      - text: A pointer to the key
-      - text: A marker for empty or deleted, or else 7 bits of the key's hash
-        correct: true
-      - text: The number of probes needed to reach the slot
-    explanation: |
-      Each control byte says whether its slot is empty, deleted or full, and for a full
-      slot it holds the low 7 bits of the hash (`h2`). Comparing those 8 bytes against
-      the target's `h2` all at once rules out most slots without touching the keys.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // lootReport counts how many times each item dropped and returns lines like
+    // "sword x3", most common first. Items with the same count are in
+    // alphabetical order. drops must not be modified.
+    func lootReport(drops []string) []string {
+    	var lines []string
+    	// ? count with a map, then sort the items: ranging over a map gives
+    	// a different order every time
+    	return lines
+    }
+
+    // byGuild inverts a player → guild map into guild → players, with each
+    // guild's players sorted alphabetically.
+    func byGuild(guildOf map[string]string) map[string][]string {
+    	var guilds map[string][]string
+    	// ?
+    	return guilds
+    }
+
+    func main() {
+    	drops := []string{"potion", "sword", "potion", "gem", "sword", "potion", "bow"}
+    	fmt.Println(lootReport(drops))
+    	// want: [potion x3 sword x2 bow x1 gem x1]
+
+    	g := byGuild(map[string]string{"mira": "owls", "kai": "foxes", "bo": "owls", "ada": "owls"})
+    	fmt.Println(g["owls"], g["foxes"], len(g))
+    	// want: [ada bo mira] [kai] 2
+    }
+  solution: |
+    package main
+
+    import (
+    	"cmp"
+    	"fmt"
+    	"maps"
+    	"slices"
+    )
+
+    // lootReport counts how many times each item dropped and returns lines like
+    // "sword x3", most common first. Items with the same count are in
+    // alphabetical order. drops must not be modified.
+    func lootReport(drops []string) []string {
+    	counts := map[string]int{}
+    	for _, d := range drops {
+    		counts[d]++
+    	}
+    	items := slices.Collect(maps.Keys(counts))
+    	slices.SortFunc(items, func(a, b string) int {
+    		return cmp.Or(cmp.Compare(counts[b], counts[a]), cmp.Compare(a, b))
+    	})
+    	lines := make([]string, 0, len(items))
+    	for _, it := range items {
+    		lines = append(lines, fmt.Sprintf("%s x%d", it, counts[it]))
+    	}
+    	return lines
+    }
+
+    // byGuild inverts a player → guild map into guild → players, with each
+    // guild's players sorted alphabetically.
+    func byGuild(guildOf map[string]string) map[string][]string {
+    	guilds := make(map[string][]string)
+    	for player, guild := range guildOf {
+    		guilds[guild] = append(guilds[guild], player)
+    	}
+    	for _, players := range guilds {
+    		slices.Sort(players)
+    	}
+    	return guilds
+    }
+
+    func main() {
+    	drops := []string{"potion", "sword", "potion", "gem", "sword", "potion", "bow"}
+    	fmt.Println(lootReport(drops))
+    	// want: [potion x3 sword x2 bow x1 gem x1]
+
+    	g := byGuild(map[string]string{"mira": "owls", "kai": "foxes", "bo": "owls", "ada": "owls"})
+    	fmt.Println(g["owls"], g["foxes"], len(g))
+    	// want: [ada bo mira] [kai] 2
+    }
+  tests: |
+    package main
+
+    import (
+    	"maps"
+    	"slices"
+    	"testing"
+    )
+
+    func TestLootReport(t *testing.T) {
+    	tests := []struct {
+    		drops []string
+    		want  []string
+    	}{
+    		{[]string{"potion", "sword", "potion", "gem", "sword", "potion", "bow"},
+    			[]string{"potion x3", "sword x2", "bow x1", "gem x1"}},
+    		{[]string{"zap", "axe", "mug", "axe", "zap", "mug"},
+    			[]string{"axe x2", "mug x2", "zap x2"}},
+    		{[]string{"gem"}, []string{"gem x1"}},
+    		{nil, []string{}},
+    	}
+    	for _, tt := range tests {
+    		in := slices.Clone(tt.drops)
+    		for range 5 { // map order is random: the answer must not be
+    			got := lootReport(in)
+    			if !slices.Equal(got, tt.want) {
+    				t.Fatalf("lootReport(%q) = %q, want %q", tt.drops, got, tt.want)
+    			}
+    		}
+    		if !slices.Equal(in, tt.drops) {
+    			t.Errorf("lootReport changed its input to %q", in)
+    		}
+    	}
+    }
+
+    func TestByGuild(t *testing.T) {
+    	guildOf := map[string]string{
+    		"mira": "owls", "kai": "foxes", "bo": "owls", "ada": "owls", "zed": "foxes", "lu": "bats",
+    	}
+    	orig := maps.Clone(guildOf)
+    	want := map[string][]string{
+    		"owls":  {"ada", "bo", "mira"},
+    		"foxes": {"kai", "zed"},
+    		"bats":  {"lu"},
+    	}
+    	for range 5 {
+    		got := byGuild(guildOf)
+    		if !maps.EqualFunc(got, want, slices.Equal) {
+    			t.Fatalf("byGuild(%v) = %v, want %v", guildOf, got, want)
+    		}
+    	}
+    	if !maps.Equal(guildOf, orig) {
+    		t.Errorf("byGuild changed its input to %v", guildOf)
+    	}
+
+    	empty := byGuild(map[string]string{})
+    	if empty == nil {
+    		t.Fatal("byGuild of an empty map returned a nil map; return an empty one so callers can add to it")
+    	}
+    	empty["newbies"] = []string{"you"} // must not panic
+    }
 ---
 
 You've built a hashmap from scratch, so let's look at how the pros do it. Go's `map`
@@ -142,6 +276,26 @@ bo=3 kai=40 mira=12 zed=27
   pointers (`map[string]*Player`) or copy out, modify and store back.
 - **Keys must be comparable**: strings, numbers, booleans, pointers, channels,
   arrays and structs of comparable types. Slices, maps and functions can't be keys.
+
+## Your turn: loot reports
+
+The studio's analytics bot posts a loot summary after every raid, and players
+keep complaining that the order changes each time. Guess why.
+
+Complete two functions:
+
+- **`lootReport(drops)`** counts each item in `drops` with a map and returns
+  lines like `"potion x3"`, most common first, with ties in alphabetical order.
+  Collect the keys with `slices.Collect(maps.Keys(counts))` and sort them with
+  `slices.SortFunc`. `cmp.Or(cmp.Compare(...), cmp.Compare(...))` is a neat way
+  to say "compare counts, and if they're equal, compare names". Don't modify
+  `drops`.
+- **`byGuild(guildOf)`** inverts a player → guild map into guild → sorted list of
+  players. Remember the nil-map gotcha: the result must be a real (non-nil) map,
+  even for empty input. Appending to a missing key's `nil` slice is fine, though.
+
+The tests call each function several times, so an answer that happens to come
+out in the right order by luck won't pass.
 
 ## Complexity
 

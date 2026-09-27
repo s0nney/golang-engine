@@ -52,7 +52,7 @@ func summarize(in <-chan MenuResult) (int, error) {
 }
 ```
 
-This fragment uses `fmt` and `errors`. Each input produces either a success or failure
+Each input produces either a success or failure
 record, and the restaurant name preserves identity even when workers finish out of
 order. The caller receives useful partial results alongside a combined error. Document
 that explicitly so callers don't throw away successful work whenever `err != nil`.

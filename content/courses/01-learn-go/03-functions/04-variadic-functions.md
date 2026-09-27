@@ -47,6 +47,67 @@ quiz:
       Putting `...` *after* a slice spreads its elements out as the variadic
       arguments. `sendAll(list)` doesn't compile, because `list` is a slice,
       not a `string`.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // totalCost returns what it costs to send all the messages when each
+    // character costs costPerChar cents.
+    func totalCost(costPerChar int, messages ...string) int {
+    	// ?
+    	return 0
+    }
+
+    func main() {
+    	fmt.Println(totalCost(2))
+    	fmt.Println(totalCost(2, "hi", "hello"))
+    	batch := []string{"a", "bc", "def"}
+    	fmt.Println(totalCost(3, batch...))
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func totalCost(costPerChar int, messages ...string) int {
+    	total := 0
+    	for _, m := range messages {
+    		total += len(m) * costPerChar
+    	}
+    	return total
+    }
+
+    func main() {
+    	fmt.Println(totalCost(2))
+    	fmt.Println(totalCost(2, "hi", "hello"))
+    	batch := []string{"a", "bc", "def"}
+    	fmt.Println(totalCost(3, batch...))
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestTotalCost(t *testing.T) {
+    	if got := totalCost(2); got != 0 {
+    		t.Errorf("totalCost(2) = %d, want 0", got)
+    	}
+    	if got := totalCost(2, "hi", "hello"); got != 14 {
+    		t.Errorf(`totalCost(2, "hi", "hello") = %d, want 14`, got)
+    	}
+    	if got := totalCost(1, "one message"); got != 11 {
+    		t.Errorf(`totalCost(1, "one message") = %d, want 11`, got)
+    	}
+    	batch := []string{"a", "bc", "def"}
+    	if got := totalCost(3, batch...); got != 18 {
+    		t.Errorf("totalCost(3, %q...) = %d, want 18", batch, got)
+    	}
+    	if got := totalCost(5, "", ""); got != 0 {
+    		t.Errorf(`totalCost(5, "", "") = %d, want 0`, got)
+    	}
+    }
 ---
 
 You've been calling a function that takes any number of arguments since your very first program:
@@ -157,6 +218,15 @@ fmt.Println(min(2.5, 1.0))   // 1
 ```
 
 And `append`, which you'll meet in the slices chapter, is variadic too. Once you recognise the pattern, you'll see it everywhere in Go's standard library.
+
+## Your turn
+
+Complete the variadic function `totalCost`. It gets a price per character in cents,
+then any number of messages. Return the total cost of sending them all: the length
+of each message times `costPerChar`, added up. With no messages, the cost is `0`.
+
+**Run** should print `0`, `14` and `18`. Notice how `main` spreads a slice into the
+last call with `batch...`.
 
 ## Further reading
 

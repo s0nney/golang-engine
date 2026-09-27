@@ -180,9 +180,11 @@ a little, so don't treat that as an error.
 ## Trust, but cap
 
 A buggy or hostile server could send `Retry-After: 86400` (a day). A command-line tool
-shouldn't silently hang for a day, so cap the wait. If the cap is lower than what the
-server asked for, it's usually better to **give up** with a clear message than to
-retry early:
+shouldn't silently hang for a day, so cap the wait. If the wait hits the cap, it's
+usually better to **give up** with a clear message than to retry early. Because
+`retryAfter` clamps, a result equal to `maxWait` means "the server asked for the cap *or
+more*", so treat reaching the cap as the signal (a server asking for exactly the cap also
+gives up, which is fine for a CLI):
 
 ```go
 const maxWait = 5 * time.Minute

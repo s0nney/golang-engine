@@ -67,7 +67,7 @@ All routes are in `internal/web/web.go`.
 | Method | Path | Handler | What it does |
 |---|---|---|---|
 | GET | `/static/*` | Fiber static | Embedded assets, `Cache-Control: max-age=3600`, compressed. |
-| GET | `/` | `home` | Roadmap: activity heatmap and streaks, the nine courses with per-course progress. |
+| GET | `/` | `home` | Roadmap: activity heatmap and streaks, all eleven courses with per-course progress. |
 | POST | `/progress/reset` | `resetProgress` | Deletes this browser's progress and activity, then 303s to `/`. |
 | GET | `/courses/:course` | `course` | Course outline with ✓ marks and a "continue" link to the first unfinished lesson. |
 | GET | `/courses/:course/:chapter/:lesson` | `lesson` | Lesson page: body, quiz, exercise, prev/next. |
@@ -79,7 +79,9 @@ All routes are in `internal/web/web.go`.
 1. `session` middleware reads the `goland_session` cookie (a UUID), or mints a new
    `uuid.NewV4()`; the cookie is refreshed for a year on every request.
 2. `lesson` loads the course outline (for prev/next and "lesson N of M"), the lesson, and
-   this session's progress on it.
+   this session's progress on it. On a course's first or last lesson, `neighbourCourses`
+   links the previous course's last lesson or the next course's first lesson, so paging
+   never dead-ends.
 3. Depending on `action`:
    - **quiz**: `grade` reads `q0`, `q1`, … option indexes from the form and checks each
      against the correct option. All correct → `Store.PassQuiz` (also records activity).

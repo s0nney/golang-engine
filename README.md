@@ -1,7 +1,7 @@
 # goland-engine
 
 A minimal, boot.dev-style platform for learning to program through Go.
-Text lessons with multiple-choice quizzes and coding exercises, nine courses on one roadmap.
+Text lessons with multiple-choice quizzes and coding exercises: a nine-course core roadmap plus two further courses.
 No accounts: progress is tied to an anonymous cookie. JavaScript is optional: htmx (vendored)
 makes Run/Submit update in place, and on exercise pages a CodeMirror editor with a toggleable
 vim mode replaces the plain textarea. Lessons, quizzes, exercises, progress and the
@@ -19,6 +19,11 @@ data storage, authoring, and development instructions.
 7. Learn Testing and Tooling in Go
 8. Learn HTTP Clients in Go
 9. Learn HTTP Servers in Go
+
+Beyond the core:
+
+10. Learn Generics and Advanced Types in Go
+11. Learn Cryptography in Go
 
 Stack: Go (module requirement: 1.27.1), Fiber v3, templ, htmx 2, SQLite
 (modernc.org/sqlite, no cgo). The runner currently requires a Unix host.

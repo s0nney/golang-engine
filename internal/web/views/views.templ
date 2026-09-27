@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"slices"
 
 	"goland-engine/internal/course"
 	"goland-engine/internal/store"
@@ -9,8 +10,9 @@ import (
 
 // Link points at a lesson.
 type Link struct {
-	URL   string
-	Title string
+	URL    string
+	Title  string
+	Course string // title of the lesson's course, set only when the link leaves the current course
 }
 
 // CourseCard is a course on the roadmap with the learner's progress.
@@ -56,6 +58,7 @@ type RunResult struct {
 	Expected string // set when a submission's output didn't match
 	Next     *Link
 	Complete bool // the lesson just became complete
+	Practice bool // a practice problem rather than a lesson exercise
 }
 
 templ layout(title string) {
@@ -72,7 +75,7 @@ templ layout(title string) {
 		<body>
 			<header>
 				<a href="/" class="brand">goland-engine</a>
-				<nav><a href="/#courses">courses</a></nav>
+				<nav><a href="/#courses">courses</a> <a href="/exercises">exercises</a></nav>
 			</header>
 			{ children... }
 			<footer>
@@ -95,28 +98,50 @@ templ Home(courses []CourseCard, activity store.Activity) {
 			<p>No account. No videos. Your progress is saved in this browser.</p>
 			@Activity(activity)
 			<h2 id="courses">The roadmap</h2>
-			<ol class="roadmap">
-				for _, c := range courses {
-					<li>
-						<a href={ templ.SafeURL("/courses/" + c.Slug) }><strong>{ c.Title }</strong></a>
-						<p>{ c.Description }</p>
-						<small>
-							{ fmt.Sprintf("%d chapters · %d lessons", c.Chapters, c.Lessons) }
-							if c.Done > 0 {
-								· <span class="done">{ fmt.Sprintf("%d done", c.Done) }</span>
-							}
-						</small>
-						if c.Done > 0 {
-							<progress max={ fmt.Sprint(c.Lessons) } value={ fmt.Sprint(c.Done) }></progress>
-						}
-					</li>
-				}
-			</ol>
+			@roadmap(coreCourses(courses), 1)
+			if beyond := beyondCourses(courses); len(beyond) > 0 {
+				<h2 id="beyond">Beyond the core</h2>
+				<p class="track-intro">
+					Finished the core? These courses go deeper into specific topics. Take them in any
+					order; nothing else on the roadmap depends on them.
+				</p>
+				@roadmap(beyond, len(courses)-len(beyond)+1)
+			}
 			<form method="post" action="/progress/reset" class="reset">
 				<button type="submit" class="quiet" onclick="return confirm('Forget all progress, activity, and streaks in this browser?')">Reset my progress</button>
 			</form>
 		</main>
 	}
+}
+
+// roadmap lists courses with their progress, numbered from start so a
+// second list continues the first one's numbering.
+templ roadmap(courses []CourseCard, start int) {
+	<ol class="roadmap" start={ fmt.Sprint(start) }>
+		for _, c := range courses {
+			<li>
+				<a href={ templ.SafeURL("/courses/" + c.Slug) }><strong>{ c.Title }</strong></a>
+				<p>{ c.Description }</p>
+				<small>
+					{ fmt.Sprintf("%d chapters · %d lessons", c.Chapters, c.Lessons) }
+					if c.Done > 0 {
+						· <span class="done">{ fmt.Sprintf("%d done", c.Done) }</span>
+					}
+				</small>
+				if c.Done > 0 {
+					<progress max={ fmt.Sprint(c.Lessons) } value={ fmt.Sprint(c.Done) }></progress>
+				}
+			</li>
+		}
+	</ol>
+}
+
+func coreCourses(cs []CourseCard) []CourseCard {
+	return slices.DeleteFunc(slices.Clone(cs), func(c CourseCard) bool { return c.Beyond })
+}
+
+func beyondCourses(cs []CourseCard) []CourseCard {
+	return slices.DeleteFunc(slices.Clone(cs), func(c CourseCard) bool { return !c.Beyond })
 }
 
 templ Course(v Outline) {
@@ -141,7 +166,7 @@ templ Course(v Outline) {
 			<ol class="chapters">
 				for _, ch := range v.Course.Chapters {
 					<li>
-						<h2>{ ch.Title }</h2>
+						<h2 id={ ch.Slug }>{ ch.Title }</h2>
 						if ch.Description != "" {
 							<p>{ ch.Description }</p>
 						}
@@ -166,20 +191,23 @@ templ LessonPage(v Lesson) {
 	@layout(v.Lesson.Title + " · " + v.Course.Title) {
 		<main class="lesson">
 			<article>
-				<p class="crumbs">
-					<a href={ templ.SafeURL("/courses/" + v.Course.Slug) }>{ v.Course.Title }</a>
-					/ { v.ChapterTitle }
-					<span class="count">
+				<div class="crumbs">
+					<p>
+						<a href={ templ.SafeURL("/courses/" + v.Course.Slug) }>{ v.Course.Title }</a>
+						/ { v.ChapterTitle }
+					</p>
+					<div class="count">
 						@status(v.Complete)
 						{ fmt.Sprintf("%d / %d", v.Number, v.Total) }
-					</span>
-				</p>
+						@lessonNav(v)
+					</div>
+				</div>
 				<h1>{ v.Lesson.Title }</h1>
 				@templ.Raw(v.Lesson.HTML)
 			</article>
 			<aside class="panels">
 				if v.Lesson.Exercise != nil {
-					@exercise(v)
+					@exercise(v.URL, v.Code, v.Output)
 				}
 				if len(v.Lesson.Quiz) > 0 {
 					@quiz(v)
@@ -188,20 +216,54 @@ templ LessonPage(v Lesson) {
 			if v.Lesson.Exercise != nil {
 				<script src="/static/editor.js" defer></script>
 			}
-			<nav class="pager">
-				if v.Prev != nil {
-					<a href={ templ.SafeURL(v.Prev.URL) } rel="prev">← { v.Prev.Title }</a>
-				} else {
-					<span></span>
-				}
-				if v.Next != nil {
-					<a href={ templ.SafeURL(v.Next.URL) } rel="next">{ v.Next.Title } →</a>
-				} else {
-					<a href={ templ.SafeURL("/courses/" + v.Course.Slug) }>Back to course →</a>
-				}
-			</nav>
+			@pager(v)
 		</main>
 	}
+}
+
+// lessonNav is a compact previous/next pair at the top of a lesson, so long
+// lessons don't need scrolling to move on.
+templ lessonNav(v Lesson) {
+	<nav class="lesson-nav" aria-label="Previous and next lesson">
+		if v.Prev != nil {
+			<a href={ templ.SafeURL(v.Prev.URL) } rel="prev" title={ v.Prev.Title }>← Previous</a>
+		}
+		if v.Next != nil {
+			<a href={ templ.SafeURL(v.Next.URL) } rel="next" title={ v.Next.Title } class="next">Next →</a>
+		}
+	</nav>
+}
+
+// pager is the full-width previous/next buttons under a lesson. At the edge
+// of a course it continues into the neighbouring course.
+templ pager(v Lesson) {
+	<nav class="pager" aria-label="Lesson navigation">
+		if v.Prev != nil {
+			<a class="pager-link prev" href={ templ.SafeURL(v.Prev.URL) } rel="prev">
+				if v.Prev.Course != "" {
+					<small>{ "← Previous course: " + v.Prev.Course }</small>
+				} else {
+					<small>← Previous lesson</small>
+				}
+				<span>{ v.Prev.Title }</span>
+			</a>
+		}
+		if v.Next != nil {
+			<a class="pager-link next" href={ templ.SafeURL(v.Next.URL) } rel="next">
+				if v.Next.Course != "" {
+					<small>{ "Next course: " + v.Next.Course + " →" }</small>
+				} else {
+					<small>Next lesson →</small>
+				}
+				<span>{ v.Next.Title }</span>
+			</a>
+		} else {
+			<a class="pager-link next" href="/">
+				<small>You've reached the end of the roadmap</small>
+				<span>Back to the roadmap →</span>
+			</a>
+		}
+	</nav>
 }
 
 templ status(complete bool) {
@@ -214,10 +276,10 @@ templ status(complete bool) {
 
 // exercise is the code editor. With htmx, Run and Submit swap only the
 // output; without it, the form posts and the whole page re-renders.
-templ exercise(v Lesson) {
+templ exercise(url, code string, out *RunResult) {
 	<section class="panel" id="exercise">
 		<h2>Exercise</h2>
-		<form method="post" action={ templ.SafeURL(v.URL + "#exercise") }>
+		<form method="post" action={ templ.SafeURL(url + "#exercise") }>
 			<label for="code" class="sr-only">Your code</label>
 			<textarea
 				id="code"
@@ -228,29 +290,29 @@ templ exercise(v Lesson) {
 				autocapitalize="off"
 				autocomplete="off"
 				hx-on:keydown="if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) { event.preventDefault(); this.setRangeText('\t', this.selectionStart, this.selectionEnd, 'end') } else if (event.key === 'Escape') { this.blur() }"
-			>{ v.Code }</textarea>
+			>{ code }</textarea>
 			<div class="editor-bar">
 				<p class="hint">Tab indents. Press Esc, then Tab, to leave the editor.</p>
 				<label class="vim-toggle" hidden><input type="checkbox"/> Vim mode</label>
 			</div>
 			<div class="actions">
-				<button type="submit" name="action" value="run" class="secondary" hx-post={ v.URL } hx-target="#output" hx-indicator="#running" hx-disabled-elt="#exercise button">Run</button>
-				<button type="submit" name="action" value="submit" hx-post={ v.URL } hx-target="#output" hx-indicator="#running" hx-disabled-elt="#exercise button">Submit</button>
+				<button type="submit" name="action" value="run" class="secondary" hx-post={ url } hx-target="#output" hx-indicator="#running" hx-disabled-elt="#exercise button">Run</button>
+				<button type="submit" name="action" value="submit" hx-post={ url } hx-target="#output" hx-indicator="#running" hx-disabled-elt="#exercise button">Submit</button>
 				<span id="running" class="htmx-indicator">Running…</span>
-				<button type="submit" name="action" value="reset" class="quiet" formnovalidate hx-post={ v.URL } hx-target="#exercise" hx-swap="outerHTML" hx-confirm="Replace your code with the starter code?">Reset code</button>
+				<button type="submit" name="action" value="reset" class="quiet" formnovalidate hx-post={ url } hx-target="#exercise" hx-swap="outerHTML" hx-confirm="Replace your code with the starter code?">Reset code</button>
 			</div>
 		</form>
 		<div id="output" aria-live="polite">
-			if v.Output != nil {
-				@Output(*v.Output)
+			if out != nil {
+				@Output(*out)
 			}
 		</div>
 	</section>
 }
 
 // Exercise renders just the exercise panel, for htmx swaps.
-templ Exercise(v Lesson) {
-	@exercise(v)
+templ Exercise(url, code string) {
+	@exercise(url, code, nil)
 }
 
 // Output renders the result of Run or Submit.
@@ -284,7 +346,15 @@ templ Output(r RunResult) {
 	}
 	if r.Submit && r.Passed {
 		<p class="passed">
-			if r.Next != nil {
+			if r.Practice && r.Next != nil {
+				<a class="button" href={ templ.SafeURL(r.Next.URL) }>Next exercise →</a>
+			} else if r.Practice {
+				<span>That's the last exercise in this course.</span>
+				<a class="button" href="/exercises">Back to exercises →</a>
+			} else if r.Next != nil && r.Next.Course != "" {
+				<span>You finished the course!</span>
+				<a class="button" href={ templ.SafeURL(r.Next.URL) }>{ "Start " + r.Next.Course + " →" }</a>
+			} else if r.Next != nil {
 				<a class="button" href={ templ.SafeURL(r.Next.URL) }>Next lesson →</a>
 			} else {
 				<span>You finished the course!</span>
@@ -292,7 +362,9 @@ templ Output(r RunResult) {
 			}
 		</p>
 	}
-	if r.Complete {
+	if r.Complete && r.Practice {
+		<span id="lesson-status" hx-swap-oob="true"><span class="done">✓ Solved</span></span>
+	} else if r.Complete {
 		<span id="lesson-status" hx-swap-oob="true"><span class="done">✓ Completed</span> · </span>
 	}
 }
@@ -445,4 +517,212 @@ func plural(count int, singular, multiple string) string {
 		return singular
 	}
 	return multiple
+}
+
+// ExerciseList is the exercises page: practice problems grouped by course.
+type ExerciseList struct {
+	Groups  []ProblemGroup
+	Courses []Link // every course with problems, for the filter; URL holds the slug
+	Course  string // current course filter, "" for all
+	Level   string // current difficulty filter, "" for all
+	Empty   bool   // there are no problems at all
+}
+
+// ProblemGroup is one course's problems on the exercises page.
+type ProblemGroup struct {
+	Title    string
+	Levels   []LevelCount // unfiltered totals for the course
+	Problems []ProblemRow
+}
+
+// LevelCount is how many of a course's problems at one difficulty are solved.
+type LevelCount struct {
+	Level         string
+	Solved, Total int
+}
+
+// ProblemRow is a problem in the list.
+type ProblemRow struct {
+	store.ProblemSummary
+	URL    string
+	Solved bool
+}
+
+// ProblemPage is a practice problem with the learner's code.
+type ProblemPage struct {
+	Problem    store.Problem
+	URL        string
+	Code       string
+	Output     *RunResult
+	Solved     bool
+	Attempts   int
+	Prev, Next *Link
+}
+
+// ProblemURL is where a practice problem lives.
+func ProblemURL(courseSlug, problemSlug string) string {
+	return "/exercises/" + courseSlug + "/" + problemSlug
+}
+
+func levelName(level string) string {
+	switch level {
+	case "easy":
+		return "Easy"
+	case "medium":
+		return "Medium"
+	case "hard":
+		return "Hard"
+	}
+	return level
+}
+
+templ badge(level string) {
+	<span class={ "badge " + level }>{ levelName(level) }</span>
+}
+
+templ Exercises(v ExerciseList) {
+	@layout("Exercises · goland-engine") {
+		<main class="narrow">
+			<h1>Exercises</h1>
+			<p>
+				Standalone coding problems to sharpen what the courses teach. Each is graded like a
+				lesson exercise and counts toward your streak. Easy problems use one idea from one
+				chapter; medium ones combine a few; hard ones give you less scaffolding and include
+				performance tests a naive solution won't pass.
+			</p>
+			if v.Empty {
+				<p>Exercises are on their way. Check back soon.</p>
+			} else {
+				<form method="get" action="/exercises" class="filters">
+					<label>
+						Course
+						<select name="course" onchange="this.form.requestSubmit()">
+							<option value="">All courses</option>
+							for _, c := range v.Courses {
+								<option value={ c.URL } selected?={ c.URL == v.Course }>{ c.Title }</option>
+							}
+						</select>
+					</label>
+					<label>
+						Difficulty
+						<select name="level" onchange="this.form.requestSubmit()">
+							<option value="">All levels</option>
+							for _, l := range []string{"easy", "medium", "hard"} {
+								<option value={ l } selected?={ l == v.Level }>{ levelName(l) }</option>
+							}
+						</select>
+					</label>
+					<button type="submit" class="secondary">Filter</button>
+				</form>
+				if len(v.Groups) == 0 {
+					<p>No exercises match those filters.</p>
+				}
+				for _, g := range v.Groups {
+					<section class="problem-group">
+						<h2>{ g.Title }</h2>
+						<p class="level-counts">
+							for i, l := range g.Levels {
+								if i > 0 {
+									{ " · " }
+								}
+								{ fmt.Sprintf("%s %d/%d", levelName(l.Level), l.Solved, l.Total) }
+							}
+						</p>
+						<ul class="problems">
+							for _, p := range g.Problems {
+								<li>
+									<a href={ templ.SafeURL(p.URL) }>{ p.Title }</a>
+									@badge(p.Difficulty)
+									if p.Solved {
+										<span class="done">✓ Solved</span>
+									}
+									if p.AfterTitle != "" {
+										<small>{ "after " + p.AfterTitle }</small>
+									}
+								</li>
+							}
+						</ul>
+					</section>
+				}
+			}
+		</main>
+	}
+}
+
+templ Problem(v ProblemPage) {
+	@layout(v.Problem.Title + " · Exercises") {
+		<main class="lesson">
+			<article>
+				<div class="crumbs">
+					<p>
+						<a href="/exercises">Exercises</a>
+						/ { v.Problem.CourseTitle }
+					</p>
+					<div class="count">
+						<span id="lesson-status">
+							if v.Solved {
+								<span class="done">✓ Solved</span>
+							}
+						</span>
+						<nav class="lesson-nav" aria-label="Previous and next exercise">
+							if v.Prev != nil {
+								<a href={ templ.SafeURL(v.Prev.URL) } rel="prev" title={ v.Prev.Title }>← Previous</a>
+							}
+							if v.Next != nil {
+								<a href={ templ.SafeURL(v.Next.URL) } rel="next" title={ v.Next.Title } class="next">Next →</a>
+							}
+						</nav>
+					</div>
+				</div>
+				<h1>
+					{ v.Problem.Title } @badge(v.Problem.Difficulty)
+				</h1>
+				if v.Problem.AfterTitle != "" {
+					<p class="draws-on">
+						Draws on
+						<a href={ templ.SafeURL("/courses/" + v.Problem.Course + "#" + v.Problem.After) }>{ v.Problem.AfterTitle }</a>
+						{ " in " + v.Problem.CourseTitle + "." }
+					</p>
+				}
+				@templ.Raw(v.Problem.HTML)
+				if len(v.Problem.Hints) > 0 {
+					<section class="hints">
+						<h2>Hints</h2>
+						for i, h := range v.Problem.Hints {
+							<details>
+								<summary>{ fmt.Sprintf("Hint %d", i+1) }</summary>
+								@templ.Raw(h)
+							</details>
+						}
+					</section>
+				}
+				if v.Attempts > 0 {
+					<p class="hint">{ fmt.Sprintf("%d %s so far.", v.Attempts, plural(v.Attempts, "submission", "submissions")) }</p>
+				}
+			</article>
+			<aside class="panels">
+				@exercise(v.URL, v.Code, v.Output)
+			</aside>
+			<script src="/static/editor.js" defer></script>
+			<nav class="pager" aria-label="Exercise navigation">
+				if v.Prev != nil {
+					<a class="pager-link prev" href={ templ.SafeURL(v.Prev.URL) } rel="prev">
+						<small>← Previous exercise</small>
+						<span>{ v.Prev.Title }</span>
+					</a>
+				}
+				if v.Next != nil {
+					<a class="pager-link next" href={ templ.SafeURL(v.Next.URL) } rel="next">
+						<small>Next exercise →</small>
+						<span>{ v.Next.Title }</span>
+					</a>
+				} else {
+					<a class="pager-link next" href="/exercises">
+						<small>Last exercise in this course</small>
+						<span>Back to exercises →</span>
+					</a>
+				}
+			</nav>
+		</main>
+	}
 }

@@ -147,7 +147,7 @@ suites use both.
 
 Anything nondeterministic is a dependency: the clock, randomness (jitter!) and
 environment variables. You already saw `retryAfter(h, now, maxWait)` take `now` as a
-parameter. For code that *sleeps*, you don't even need to inject a clock: lesson 5
+parameter. For code that *sleeps*, you don't even need to inject a clock: lesson 4
 uses `testing/synctest`, which fakes time for everything inside a bubble.
 
 ## Configuration as injection

@@ -113,7 +113,7 @@ Notice that this run also *lost an update*: 9 instead of 10. That time the bug w
 - Write tests that actually run things concurrently: call the method from 50 goroutines at once, not just once.
 - When a report looks "harmless" (a stats counter that's only a bit off), fix it anyway. A data race is undefined behaviour, and harmless-looking races have a way of corrupting something important later.
 
-(The exercises on this site can't use `-race`: they run on a sandbox without it. So their tests catch the *effects* of races instead. On your own machine, always use it.)
+(When you press **Submit**, this site runs `go test -v` without `-race`, so the exercise tests catch the *effects* of races instead. On your own machine, always add `-race`.)
 
 ## Further reading
 

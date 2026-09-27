@@ -1,0 +1,2 @@
+title: The Type System
+description: Named types and type literals, underlying types, type identity, assignability and conversion, untyped constants, and type definitions versus aliases.

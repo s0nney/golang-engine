@@ -15,7 +15,7 @@ There are two kinds of table:
 ## Content tables (`store.go`)
 
 ```
-courses    (id, slug UNIQUE, title, description, position)
+courses    (id, slug UNIQUE, title, description, beyond, position)
 chapters   (id, course_id → courses, slug, title, description, position, UNIQUE(course_id, slug))
 lessons    (id, chapter_id → chapters, slug, title, html, position, UNIQUE(chapter_id, slug))
 questions  (id, lesson_id → lessons, prompt, explanation, position)

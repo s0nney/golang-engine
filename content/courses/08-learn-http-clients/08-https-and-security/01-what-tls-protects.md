@@ -88,8 +88,8 @@ the `SecP256r1MLKEM768` and `SecP384r1MLKEM1024` hybrids to the defaults as well
 
 You don't have to do anything to get this. It's negotiated automatically when the
 server supports it and falls back to classic key exchange when it doesn't. (Setting
-`tls.Config.CurvePreferences` yourself, or `GODEBUG=tlsmlkem=0`, turns it off, so leave
-them alone unless you have a reason.) In the next lesson you'll see
+`tls.Config.CurvePreferences` to your own list that leaves the hybrids out, or running
+with `GODEBUG=tlsmlkem=0`, turns it off, so leave them alone unless you have a reason.) In the next lesson you'll see
 `X25519MLKEM768` show up in a real connection.
 
 ## In Go, HTTPS is just a URL

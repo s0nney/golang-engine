@@ -22,6 +22,123 @@ quiz:
     explanation: |
       Passing the time in as a parameter makes `Greeting` pure. Production code
       passes `time.Now()`, and tests pass whatever time they need.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"fmt"
+    	"strings"
+    	"time"
+    )
+
+    // wordsPerMinute is global configuration. Pure functions shouldn't read it.
+    var wordsPerMinute = 200
+
+    // readingTime returns how many minutes it takes to read doc at wpm words
+    // per minute, rounded UP, and never less than 1.
+    func readingTime(doc string, wpm int) int {
+    	words := len(strings.Fields(doc))
+    	return words / wordsPerMinute // BUG: ignores wpm, rounds down
+    }
+
+    // header returns the line Doc2Doc puts above every document, e.g.
+    //
+    //	Updated 2026-09-27 · 3 min read
+    //
+    // using now for the date (in time.DateOnly format) and readingTime(doc, wpm).
+    func header(doc string, wpm int, now time.Time) string {
+    	return fmt.Sprintf("Updated %s · %d min read",
+    		time.Now().Format(time.DateOnly), readingTime(doc, wpm)) // BUG: ignores now
+    }
+
+    func main() {
+    	doc := strings.Repeat("word ", 450)
+    	day := time.Date(2026, time.September, 27, 9, 0, 0, 0, time.UTC)
+    	fmt.Println(header(doc, 200, day)) // should print: Updated 2026-09-27 · 3 min read
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"strings"
+    	"time"
+    )
+
+    // wordsPerMinute is global configuration. Pure functions shouldn't read it.
+    var wordsPerMinute = 200
+
+    // readingTime returns how many minutes it takes to read doc at wpm words
+    // per minute, rounded UP, and never less than 1.
+    func readingTime(doc string, wpm int) int {
+    	words := len(strings.Fields(doc))
+    	return max(1, (words+wpm-1)/wpm)
+    }
+
+    // header returns the line Doc2Doc puts above every document, e.g.
+    //
+    //	Updated 2026-09-27 · 3 min read
+    //
+    // using now for the date (in time.DateOnly format) and readingTime(doc, wpm).
+    func header(doc string, wpm int, now time.Time) string {
+    	return fmt.Sprintf("Updated %s · %d min read",
+    		now.Format(time.DateOnly), readingTime(doc, wpm))
+    }
+
+    func main() {
+    	doc := strings.Repeat("word ", 450)
+    	day := time.Date(2026, time.September, 27, 9, 0, 0, 0, time.UTC)
+    	fmt.Println(header(doc, 200, day))
+    }
+  tests: |
+    package main
+
+    import (
+    	"strings"
+    	"testing"
+    	"time"
+    )
+
+    func TestReadingTime(t *testing.T) {
+    	wordsPerMinute = 1 // pure functions must ignore this
+    	defer func() { wordsPerMinute = 200 }()
+    	for _, tt := range []struct{ words, wpm, want int }{
+    		{0, 200, 1},
+    		{1, 200, 1},
+    		{200, 200, 1},
+    		{201, 200, 2},
+    		{450, 200, 3},
+    		{450, 100, 5},
+    		{1000, 250, 4},
+    	} {
+    		doc := strings.Repeat("word ", tt.words)
+    		if got := readingTime(doc, tt.wpm); got != tt.want {
+    			t.Errorf("readingTime(<%d words>, %d) = %d, want %d", tt.words, tt.wpm, got, tt.want)
+    		}
+    	}
+    }
+
+    func TestHeader(t *testing.T) {
+    	for _, tt := range []struct {
+    		words int
+    		wpm   int
+    		now   time.Time
+    		want  string
+    	}{
+    		{450, 200, time.Date(2026, time.September, 27, 9, 0, 0, 0, time.UTC), "Updated 2026-09-27 · 3 min read"},
+    		{10, 200, time.Date(1999, time.December, 31, 23, 59, 0, 0, time.UTC), "Updated 1999-12-31 · 1 min read"},
+    		{600, 120, time.Date(2030, time.January, 2, 0, 0, 0, 0, time.UTC), "Updated 2030-01-02 · 5 min read"},
+    	} {
+    		doc := strings.Repeat("word ", tt.words)
+    		if got := header(doc, tt.wpm, tt.now); got != tt.want {
+    			t.Errorf("header(<%d words>, %d, %s) = %q, want %q", tt.words, tt.wpm, tt.now.Format(time.DateOnly), got, tt.want)
+    		}
+    		if a, b := header(doc, tt.wpm, tt.now), header(doc, tt.wpm, tt.now); a != b {
+    			t.Errorf("header is not pure: two identical calls returned %q and %q", a, b)
+    		}
+    	}
+    }
 ---
 
 The biggest practical payoff of pure functions is testing. A pure function needs no
@@ -124,3 +241,12 @@ The same trick works for functions: accept a `func() time.Time` or a
 `func(string) ([]byte, error)` parameter, and tests can pass in a fake. Functions
 as values make dependency injection cheap in Go, with no interfaces or frameworks
 needed.
+
+## Your turn
+
+Doc2Doc's header line (`Updated 2026-09-27 · 3 min read`) was written in a hurry, and it's impure in two ways: `readingTime` reads a global setting, and `header` asks the real clock for the date. The hidden tests call them with fixed inputs and expect fixed outputs, so neither can sneak a peek at the outside world.
+
+1. Fix `readingTime(doc, wpm)` to use its `wpm` parameter (not the global), rounding **up**, and never returning less than 1 minute.
+2. Fix `header(doc, wpm, now)` to use the `now` it was given.
+
+Integer division rounds down; `(words + wpm - 1) / wpm` rounds up. The `max` built-in handles the minimum.

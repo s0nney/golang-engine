@@ -31,6 +31,100 @@ quiz:
       A package is all the `.go` files in one directory. Package-level names,
       exported or not, are shared across every file in the package. Files
       never import each other.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // Imagine this file is the billing package. Fix the capital letters so
+    // only the API that other packages need is exported.
+
+    // maxSegments is the most segments Textio will send for one message.
+    const maxSegments = 3
+
+    // cost returns the price in cents of sending body, or -1 if it's too long.
+    func cost(body string) int {
+    	n := Segments(body)
+    	if n > maxSegments {
+    		return -1
+    	}
+    	return n * CentsPerSegment
+    }
+
+    // Segments reports how many 160-character SMS segments body needs.
+    func Segments(body string) int {
+    	return (len(body) + 159) / 160
+    }
+
+    // CentsPerSegment is an internal price detail.
+    const CentsPerSegment = 2
+
+    func main() {
+    	fmt.Println(cost("Your code is 4821"), maxSegments)
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    // MaxSegments is the most segments Textio will send for one message.
+    const MaxSegments = 3
+
+    // Cost returns the price in cents of sending body, or -1 if it's too long.
+    func Cost(body string) int {
+    	n := segments(body)
+    	if n > MaxSegments {
+    		return -1
+    	}
+    	return n * centsPerSegment
+    }
+
+    // segments reports how many 160-character SMS segments body needs.
+    func segments(body string) int {
+    	return (len(body) + 159) / 160
+    }
+
+    // centsPerSegment is an internal price detail.
+    const centsPerSegment = 2
+
+    func main() {
+    	fmt.Println(Cost("Your code is 4821"), MaxSegments)
+    }
+  tests: |
+    package main
+
+    import (
+    	"strings"
+    	"testing"
+    )
+
+    // This test only compiles if the exported and unexported names are right.
+    func TestAPI(t *testing.T) {
+    	if MaxSegments != 3 {
+    		t.Errorf("MaxSegments = %d, want 3", MaxSegments)
+    	}
+    	if centsPerSegment != 2 {
+    		t.Errorf("centsPerSegment = %d, want 2", centsPerSegment)
+    	}
+    	for _, tc := range []struct {
+    		body string
+    		want int
+    	}{
+    		{"Your code is 4821", 2},
+    		{strings.Repeat("a", 160), 2},
+    		{strings.Repeat("a", 161), 4},
+    		{strings.Repeat("a", 480), 6},
+    		{strings.Repeat("a", 481), -1},
+    	} {
+    		if got := Cost(tc.body); got != tc.want {
+    			t.Errorf("Cost(<%d characters>) = %d, want %d", len(tc.body), got, tc.want)
+    		}
+    		if got := segments(tc.body); got != (len(tc.body)+159)/160 {
+    			t.Errorf("segments(<%d characters>) = %d", len(tc.body), got)
+    		}
+    	}
+    }
 ---
 
 Real programs are too big for one file. Textio's backend has code for billing, carriers, phone number validation and much more. Go organises code into **packages**.
@@ -130,6 +224,21 @@ A package named `main` with a `func main()` builds into a **program**. Every oth
 ## Doc comments
 
 Notice the comments right above `package billing` and `func Cost`. A comment directly before a declaration is its **doc comment**. Tools like `go doc` and pkg.go.dev display them as documentation. Start each one with the name it describes: "Cost returns...". Every exported name should have one.
+
+## Your turn
+
+The exercise editor only holds one file, so imagine the code above `main` is the
+`billing` package. Whoever wrote it got the capital letters backwards: the helpers
+are exported and the real API isn't.
+
+Rename things so that:
+
+- `Cost` and `MaxSegments` are **exported**: other packages need them.
+- `segments` and `centsPerSegment` are **unexported**: they're implementation details.
+
+Update every use of each name, and the doc comments too (a doc comment starts with
+the name it documents). Your editor would do this with a "rename symbol" command;
+here, do it by hand. **Run** should still print `2 3`.
 
 ## Further reading
 

@@ -107,7 +107,7 @@ func Example_accounts() {
 	}
 	// Unordered output:
 	// cash $50.00
-	// rent -$1200.00
+	// rent -$1,200.00
 }
 ```
 

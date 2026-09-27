@@ -38,6 +38,170 @@ quiz:
       tiny critical sections or write-heavy workloads, the extra bookkeeping
       of an `RWMutex` makes it slower than a `Mutex`. Measure before
       switching.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"fmt"
+    	"sync"
+    )
+
+    // Dispatch tracks which order each courier is carrying.
+    // Many goroutines call its methods at the same time.
+    type Dispatch struct {
+    	mu       sync.Mutex
+    	carrying map[string]string // courier -> order ID, guarded by mu
+    }
+
+    func NewDispatch() *Dispatch {
+    	return &Dispatch{carrying: make(map[string]string)}
+    }
+
+    // Assign gives order to courier if the courier is free.
+    // It reports whether the assignment happened.
+    func (d *Dispatch) Assign(courier, order string) bool {
+    	// TODO
+    	return false
+    }
+
+    // Release marks courier as free again.
+    func (d *Dispatch) Release(courier string) {
+    	// TODO
+    }
+
+    // Busy returns how many couriers are carrying an order.
+    func (d *Dispatch) Busy() int {
+    	// TODO
+    	return 0
+    }
+
+    func main() {
+    	d := NewDispatch()
+    	fmt.Println(d.Assign("ana", "A1")) // true
+    	fmt.Println(d.Assign("ana", "B2")) // false: ana is busy
+    	fmt.Println(d.Busy())              // 1
+    	d.Release("ana")
+    	fmt.Println(d.Assign("ana", "B2")) // true
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"sync"
+    )
+
+    // Dispatch tracks which order each courier is carrying.
+    // Many goroutines call its methods at the same time.
+    type Dispatch struct {
+    	mu       sync.Mutex
+    	carrying map[string]string // courier -> order ID, guarded by mu
+    }
+
+    func NewDispatch() *Dispatch {
+    	return &Dispatch{carrying: make(map[string]string)}
+    }
+
+    // Assign gives order to courier if the courier is free.
+    // It reports whether the assignment happened.
+    func (d *Dispatch) Assign(courier, order string) bool {
+    	d.mu.Lock()
+    	defer d.mu.Unlock()
+    	if _, busy := d.carrying[courier]; busy {
+    		return false
+    	}
+    	d.carrying[courier] = order
+    	return true
+    }
+
+    // Release marks courier as free again.
+    func (d *Dispatch) Release(courier string) {
+    	d.mu.Lock()
+    	defer d.mu.Unlock()
+    	delete(d.carrying, courier)
+    }
+
+    // Busy returns how many couriers are carrying an order.
+    func (d *Dispatch) Busy() int {
+    	d.mu.Lock()
+    	defer d.mu.Unlock()
+    	return len(d.carrying)
+    }
+
+    func main() {
+    	d := NewDispatch()
+    	fmt.Println(d.Assign("ana", "A1")) // true
+    	fmt.Println(d.Assign("ana", "B2")) // false: ana is busy
+    	fmt.Println(d.Busy())              // 1
+    	d.Release("ana")
+    	fmt.Println(d.Assign("ana", "B2")) // true
+    }
+  tests: |
+    package main
+
+    import (
+    	"fmt"
+    	"sync"
+    	"sync/atomic"
+    	"testing"
+    )
+
+    func TestAssignAndRelease(t *testing.T) {
+    	d := NewDispatch()
+    	if !d.Assign("ana", "A1") {
+    		t.Fatal(`Assign("ana", "A1") on a free courier = false, want true`)
+    	}
+    	if d.Assign("ana", "B2") {
+    		t.Error(`Assign("ana", "B2") while ana carries A1 = true, want false`)
+    	}
+    	if got := d.Busy(); got != 1 {
+    		t.Errorf("Busy() = %d, want 1", got)
+    	}
+    	d.Release("ana")
+    	if got := d.Busy(); got != 0 {
+    		t.Errorf("Busy() after Release = %d, want 0", got)
+    	}
+    	if !d.Assign("ana", "B2") {
+    		t.Error(`Assign("ana", "B2") after Release = false, want true`)
+    	}
+    }
+
+    func TestOneWinnerPerCourier(t *testing.T) {
+    	d := NewDispatch()
+    	var wins atomic.Int32
+    	var wg sync.WaitGroup
+    	for i := range 200 {
+    		wg.Go(func() {
+    			if d.Assign("ben", fmt.Sprint("order-", i)) {
+    				wins.Add(1)
+    			}
+    		})
+    	}
+    	wg.Wait()
+    	if got := wins.Load(); got != 1 {
+    		t.Errorf("200 goroutines raced to assign ben; %d won, want exactly 1", got)
+    	}
+    }
+
+    func TestManyCouriersConcurrently(t *testing.T) {
+    	d := NewDispatch()
+    	var wg sync.WaitGroup
+    	for i := range 50 {
+    		wg.Go(func() {
+    			courier := fmt.Sprint("courier-", i)
+    			d.Assign(courier, "X")
+    			d.Busy()
+    			if i%2 == 0 {
+    				d.Release(courier)
+    			}
+    		})
+    	}
+    	wg.Wait()
+    	if got := d.Busy(); got != 25 {
+    		t.Errorf("Busy() = %d after 50 assigns and 25 releases, want 25", got)
+    	}
+    }
 ---
 
 Channels are Go's headline feature, but they're not always the right tool. When several goroutines need to read and update **shared state** (a cache, a registry, a counter), a lock is usually simpler. As the Go proverb goes, *share memory by communicating*, but the standard library ships `sync` for a reason.
@@ -136,10 +300,10 @@ func report(c Counter) { // Counter contains a sync.Mutex
 }
 ```
 
-`go vet` catches this:
+`go vet` catches this (the type is shown with its package path):
 
 ```text
-report passes lock by value: Counter contains sync.Mutex
+./main.go:13:15: report passes lock by value: dispatchly.Counter contains sync.Mutex
 ```
 
 Use pointer receivers on types with a mutex, and pass them as pointers.
@@ -147,6 +311,16 @@ Use pointer receivers on types with a mutex, and pass them as pointers.
 **Keep critical sections small.** Hold a lock only while touching shared state. Don't call a restaurant API or send on a channel while holding one: every other goroutine that needs the lock waits for that slow call, and a blocked channel send while locked is a classic deadlock. Copy what you need, unlock, then do the slow part.
 
 **Protect every access.** A lock only works if *every* read and write of the data goes through it. One unguarded read in a logging function is still a data race.
+
+## Your turn
+
+Dispatchly must never hand one courier two orders at once. Complete the three methods on `Dispatch`:
+
+- `Assign(courier, order)` records the order and returns `true` only if the courier is free; otherwise it changes nothing and returns `false`.
+- `Release(courier)` frees the courier.
+- `Busy()` returns how many couriers are carrying an order.
+
+The tests call them from hundreds of goroutines at once, and exactly one of 200 racing `Assign("ben", ...)` calls may win. The check ("is ben free?") and the write must happen under the **same** lock hold, or two goroutines can both see "free".
 
 ## Further reading
 

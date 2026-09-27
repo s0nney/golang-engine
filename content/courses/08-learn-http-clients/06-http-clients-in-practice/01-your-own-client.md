@@ -107,8 +107,8 @@ client := &http.Client{
 ```
 
 `via` holds the requests made so far, oldest first. This one refuses to leave the
-Trackr host, which keeps custom auth headers like `X-Api-Key` from leaking (see the
-last chapter).
+Trackr host, which keeps custom auth headers like `X-Api-Key` from leaking (see
+"Redirects and credentials" in chapter 5).
 
 ## Let callers inject it
 

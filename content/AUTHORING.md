@@ -63,6 +63,10 @@ content/courses/NN-course-slug/NN-chapter-slug/NN-lesson-slug.md
 - The `NN-` two-digit prefix sets the order. The slug after it (lowercase, digits, hyphens)
   becomes part of the URL.
 - `course.yaml` and `chapter.yaml` hold `title:` and `description:` (one or two sentences).
+- `course.yaml` may also set `track: beyond` for a course that goes beyond the nine-course
+  core. The roadmap lists those after the core under a "Beyond the core" heading.
+  Leave it out (or write `track: core`) for core courses. Give beyond courses higher
+  `NN-` numbers than the core so the roadmap order and Next buttons stay sensible.
 
 ## Lesson file
 

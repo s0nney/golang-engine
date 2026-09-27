@@ -29,6 +29,104 @@ quiz:
       `%q` prints the value in quotes, with special characters escaped, so
       invisible problems like trailing spaces, tabs (`\t`) and newlines
       (`\n`) become visible. With `%s` you'd just see `Alice`.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // lastMessage returns the most recent message, or "" if there are none.
+    func lastMessage(msgs []string) string {
+    	return msgs[len(msgs)]
+    }
+
+    // countFailed returns how many statuses are "failed".
+    func countFailed(statuses []string) int {
+    	failed := 0
+    	for _, s := range statuses {
+    		failed := 0
+    		if s == "failed" {
+    			failed++
+    		}
+    	}
+    	return failed
+    }
+
+    func main() {
+    	fmt.Println(countFailed([]string{"sent", "failed", "failed"}))
+    	fmt.Println(lastMessage([]string{"hi", "running late", "here!"}))
+    	fmt.Println(lastMessage(nil))
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func lastMessage(msgs []string) string {
+    	if len(msgs) == 0 {
+    		return ""
+    	}
+    	return msgs[len(msgs)-1]
+    }
+
+    func countFailed(statuses []string) int {
+    	failed := 0
+    	for _, s := range statuses {
+    		if s == "failed" {
+    			failed++
+    		}
+    	}
+    	return failed
+    }
+
+    func main() {
+    	fmt.Println(countFailed([]string{"sent", "failed", "failed"}))
+    	fmt.Println(lastMessage([]string{"hi", "running late", "here!"}))
+    	fmt.Println(lastMessage(nil))
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestLastMessage(t *testing.T) {
+    	for _, tc := range []struct {
+    		msgs []string
+    		want string
+    	}{
+    		{[]string{"hi", "running late", "here!"}, "here!"},
+    		{[]string{"only one"}, "only one"},
+    		{nil, ""},
+    		{[]string{}, ""},
+    	} {
+    		func() {
+    			defer func() {
+    				if r := recover(); r != nil {
+    					t.Errorf("lastMessage(%q) panicked: %v", tc.msgs, r)
+    				}
+    			}()
+    			if got := lastMessage(tc.msgs); got != tc.want {
+    				t.Errorf("lastMessage(%q) = %q, want %q", tc.msgs, got, tc.want)
+    			}
+    		}()
+    	}
+    }
+
+    func TestCountFailed(t *testing.T) {
+    	for _, tc := range []struct {
+    		statuses []string
+    		want     int
+    	}{
+    		{[]string{"sent", "failed", "failed"}, 2},
+    		{[]string{"failed"}, 1},
+    		{[]string{"sent", "sent"}, 0},
+    		{nil, 0},
+    	} {
+    		if got := countFailed(tc.statuses); got != tc.want {
+    			t.Errorf("countFailed(%q) = %d, want %d", tc.statuses, got, tc.want)
+    		}
+    	}
+    }
 ---
 
 Every programmer spends a lot of time with code that doesn't work yet. The difference between a beginner and an experienced developer isn't that the expert makes fewer mistakes. It's that they find them faster. Here's how.
@@ -128,6 +226,20 @@ When you have no idea where a bug is, shrink the search space:
 ## Debuggers
 
 For tricky bugs, a **debugger** lets you pause a running program, step through it line by line and inspect every variable. The standard Go debugger is **Delve** (`dlv`), and most editors, such as VS Code and GoLand, integrate it so you can click to set breakpoints. Print debugging and tests will take you a long way, but it's worth learning a debugger once you're comfortable with the basics.
+
+## Your turn
+
+This program has two bugs. Debug it the way this lesson describes:
+
+1. Press **Run**. `countFailed` prints `0` even though two messages failed. Add a
+   `fmt.Printf("DEBUG ...")` line inside the loop if you need to, and look closely
+   at every `:=`. (Hint: the shadowing chapter.)
+2. Once that's fixed, **Run** panics. Read the panic message and the stack trace
+   to find the line in `lastMessage`, then fix it. It must also return `""` for an
+   empty or nil slice instead of crashing.
+
+Remove any debug prints before you submit. When everything works, **Run** prints
+`2`, `here!` and an empty line.
 
 ## Further reading
 

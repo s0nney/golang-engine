@@ -71,7 +71,9 @@ dispatch.lookup.func1()
 created by dispatch.lookup in goroutine 9
 ```
 
-The panic lists each goroutine left behind, where it's stuck and where it was started. `make(chan Order, 1)` fixes the abandoned send, but the test must also allow the fetch goroutine to finish before returning. Once the test function returns, fake time stops, which is why the stack above still shows `Sleep`. For this two-second fake fetch, add `time.Sleep(2 * time.Second)` after the timeout assertion, then `synctest.Wait()` to let the awakened worker finish its send. With a buffered channel the test passes; with an unbuffered channel the worker remains stuck sending and the bubble reports a leak. In application code, prefer cancelling work and joining it explicitly when the operation supports cancellation.
+The panic lists each goroutine left behind, where it's stuck and where it was started.
+
+The fix is `make(chan Order, 1)`, so the send can always complete. The test also has to let the fetch finish: once the test function returns, the bubble's clock stops, which is why the stack above is still in `Sleep`. Add `synctest.Sleep(2 * time.Second)` after the assertion. With the buffered channel the fetch goroutine now sends and exits, and the test passes. With the unbuffered channel it's stuck sending forever, and the bubble reports the leak, every run.
 
 Without synctest, the standard trick is to compare `runtime.NumGoroutine()` before and after, allowing some time for goroutines to exit, as the pipeline exercise's tests did.
 
@@ -150,4 +152,4 @@ You now have the core tools for concurrent Go:
 
 The habits matter more than any single API: know how every goroutine will stop, watch `ctx.Done()` wherever you wait, keep locks short, and test with fake time instead of sleeps. Dispatchly's couriers are in good hands.
 
-The next chapter extends these checks with runtime metrics, contention profiles, and execution traces for investigating a running Dispatchly service.
+One job left: in the next lesson you'll assemble these pieces into Dispatchly's batch engine and test it with fake time.

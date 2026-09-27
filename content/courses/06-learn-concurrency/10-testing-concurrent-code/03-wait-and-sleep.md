@@ -380,7 +380,7 @@ A good rule: **in a synctest test, use `synctest.Sleep` wherever you'd use `time
 
 ## Deterministic, not just fast
 
-Look back at the exercises in this course. Many of their tests check things like "`collectBids` returned after exactly 1m0s" or "the pipeline stopped at 25s". That precision is only possible because fake time is exact and `Wait` removes scheduling guesswork. Tests like these don't flake, don't need retries, and run in milliseconds.
+Look back at the exercises in this course. Many of their tests check things like "`collectBids` returned after exactly 1m0s" or "10 orders with 3 workers took exactly 4s". That precision is only possible because fake time is exact and `Wait` removes scheduling guesswork. Tests like these don't flake, don't need retries, and run in milliseconds.
 
 ## Your turn
 

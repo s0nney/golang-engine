@@ -1,0 +1,2 @@
+title: Interfaces in Depth
+description: What's inside an interface value, method sets and addressability, optional interfaces, type switches in generic code, nil interfaces revisited, and choosing between any and generics.

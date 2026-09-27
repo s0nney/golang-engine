@@ -6,56 +6,55 @@ exercise:
 
     import (
     	"fmt"
-    	"net/http"
-    	"net/http/httptest"
+    	"slices"
+    	"strings"
     )
 
-    type Middleware func(http.Handler) http.Handler
+    type Converter func(string) string
 
-    // statusRecorder wraps a ResponseWriter and remembers the status code.
-    // Handlers that never call WriteHeader send 200, so start it at 200.
-    type statusRecorder struct {
-    	http.ResponseWriter
-    	status int
+    type Middleware func(Converter) Converter
+
+    func Chain(c Converter, mws ...Middleware) Converter {
+    	for _, mw := range slices.Backward(mws) {
+    		c = mw(c)
+    	}
+    	return c
     }
 
-    func (r *statusRecorder) WriteHeader(code int) {
-    	r.status = code
-    	r.ResponseWriter.WriteHeader(code)
-    }
-
-    // logRequests returns a middleware that, after the wrapped handler has
-    // run, calls logf with "METHOD PATH -> STATUS", e.g. "GET /convert -> 200".
-    func logRequests(logf func(string)) Middleware {
-    	return func(next http.Handler) http.Handler {
+    // logSizes returns a middleware that, AFTER the wrapped converter has
+    // run, calls logf with "NAME: IN bytes -> OUT bytes",
+    // e.g. "md->html: 7 bytes -> 14 bytes".
+    func logSizes(name string, logf func(string)) Middleware {
+    	return func(next Converter) Converter {
     		// ?
     		return next
     	}
     }
 
-    // Chain wraps h in every middleware so that the FIRST one in mws is the
-    // outermost layer (it sees the request first).
-    func Chain(h http.Handler, mws ...Middleware) http.Handler {
-    	// ?
-    	return h
+    // recoverPanics returns a middleware that stops a panic in the wrapped
+    // converter from escaping. When one happens it calls logf with
+    // "panic: <value>" and the converter returns "<!-- conversion failed -->".
+    func recoverPanics(logf func(string)) Middleware {
+    	return func(next Converter) Converter {
+    		// ?
+    		return next
+    	}
     }
 
-    func convert(w http.ResponseWriter, r *http.Request) {
-    	if r.URL.Query().Get("fmt") == "pdf" {
-    		http.Error(w, "pdf not supported", http.StatusNotImplemented)
-    		return
+    func markdownToHTML(doc string) string {
+    	if strings.HasPrefix(doc, "%PDF") {
+    		panic("PDF input not supported")
     	}
-    	fmt.Fprint(w, "<h1>converted</h1>")
+    	return "<h1>" + strings.TrimPrefix(doc, "# ") + "</h1>"
     }
 
     func main() {
     	logf := func(s string) { fmt.Println("log:", s) }
-    	h := Chain(http.HandlerFunc(convert), logRequests(logf))
+    	convert := Chain(markdownToHTML, recoverPanics(logf), logSizes("md->html", logf))
 
-    	for _, url := range []string{"/convert?fmt=html", "/convert?fmt=pdf"} {
-    		rec := httptest.NewRecorder()
-    		h.ServeHTTP(rec, httptest.NewRequest("POST", url, nil))
-    		fmt.Println("status:", rec.Code)
+    	// The PDF will panic until recoverPanics works.
+    	for _, doc := range []string{"# Hello", "%PDF-1.7"} {
+    		fmt.Println("result:", convert(doc))
     	}
     }
   solution: |
@@ -63,165 +62,156 @@ exercise:
 
     import (
     	"fmt"
-    	"net/http"
-    	"net/http/httptest"
     	"slices"
+    	"strings"
     )
 
-    type Middleware func(http.Handler) http.Handler
+    type Converter func(string) string
 
-    // statusRecorder wraps a ResponseWriter and remembers the status code.
-    // Handlers that never call WriteHeader send 200, so start it at 200.
-    type statusRecorder struct {
-    	http.ResponseWriter
-    	status int
-    }
+    type Middleware func(Converter) Converter
 
-    func (r *statusRecorder) WriteHeader(code int) {
-    	r.status = code
-    	r.ResponseWriter.WriteHeader(code)
-    }
-
-    // logRequests returns a middleware that, after the wrapped handler has
-    // run, calls logf with "METHOD PATH -> STATUS", e.g. "GET /convert -> 200".
-    func logRequests(logf func(string)) Middleware {
-    	return func(next http.Handler) http.Handler {
-    		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-    			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-    			next.ServeHTTP(rec, r)
-    			logf(fmt.Sprintf("%s %s -> %d", r.Method, r.URL.Path, rec.status))
-    		})
-    	}
-    }
-
-    // Chain wraps h in every middleware so that the FIRST one in mws is the
-    // outermost layer (it sees the request first).
-    func Chain(h http.Handler, mws ...Middleware) http.Handler {
+    func Chain(c Converter, mws ...Middleware) Converter {
     	for _, mw := range slices.Backward(mws) {
-    		h = mw(h)
+    		c = mw(c)
     	}
-    	return h
+    	return c
     }
 
-    func convert(w http.ResponseWriter, r *http.Request) {
-    	if r.URL.Query().Get("fmt") == "pdf" {
-    		http.Error(w, "pdf not supported", http.StatusNotImplemented)
-    		return
+    func logSizes(name string, logf func(string)) Middleware {
+    	return func(next Converter) Converter {
+    		return func(doc string) string {
+    			out := next(doc)
+    			logf(fmt.Sprintf("%s: %d bytes -> %d bytes", name, len(doc), len(out)))
+    			return out
+    		}
     	}
-    	fmt.Fprint(w, "<h1>converted</h1>")
+    }
+
+    func recoverPanics(logf func(string)) Middleware {
+    	return func(next Converter) Converter {
+    		return func(doc string) (out string) {
+    			defer func() {
+    				if r := recover(); r != nil {
+    					logf(fmt.Sprint("panic: ", r))
+    					out = "<!-- conversion failed -->"
+    				}
+    			}()
+    			return next(doc)
+    		}
+    	}
+    }
+
+    func markdownToHTML(doc string) string {
+    	if strings.HasPrefix(doc, "%PDF") {
+    		panic("PDF input not supported")
+    	}
+    	return "<h1>" + strings.TrimPrefix(doc, "# ") + "</h1>"
     }
 
     func main() {
     	logf := func(s string) { fmt.Println("log:", s) }
-    	h := Chain(http.HandlerFunc(convert), logRequests(logf))
+    	convert := Chain(markdownToHTML, recoverPanics(logf), logSizes("md->html", logf))
 
-    	for _, url := range []string{"/convert?fmt=html", "/convert?fmt=pdf"} {
-    		rec := httptest.NewRecorder()
-    		h.ServeHTTP(rec, httptest.NewRequest("POST", url, nil))
-    		fmt.Println("status:", rec.Code)
+    	for _, doc := range []string{"# Hello", "%PDF-1.7"} {
+    		fmt.Println("result:", convert(doc))
     	}
     }
   tests: |
     package main
 
     import (
-    	"fmt"
-    	"net/http"
-    	"net/http/httptest"
     	"slices"
     	"testing"
     )
 
-    func TestLogRequests(t *testing.T) {
+    func TestLogSizes(t *testing.T) {
+    	var events []string
+    	logf := func(s string) { events = append(events, s) }
+    	inner := func(doc string) string {
+    		events = append(events, "convert")
+    		return "<p>" + doc + "</p>"
+    	}
+    	c := logSizes("txt->html", logf)(inner)
+    	if got := c("hello"); got != "<p>hello</p>" {
+    		t.Errorf("wrapped converter returned %q, want %q (return next's result)", got, "<p>hello</p>")
+    	}
+    	want := []string{"convert", "txt->html: 5 bytes -> 12 bytes"}
+    	if !slices.Equal(events, want) {
+    		t.Errorf("events = %q, want %q (log once, after the converter runs)", events, want)
+    	}
+    }
+
+    func TestRecoverPanics(t *testing.T) {
     	var logs []string
-    	h := logRequests(func(s string) { logs = append(logs, s) })(http.HandlerFunc(convert))
+    	logf := func(s string) { logs = append(logs, s) }
+    	c := recoverPanics(logf)(markdownToHTML)
 
-    	rec := httptest.NewRecorder()
-    	h.ServeHTTP(rec, httptest.NewRequest("GET", "/convert?fmt=html", nil))
-    	if rec.Code != 200 || rec.Body.String() != "<h1>converted</h1>" {
-    		t.Errorf("wrapped handler responded %d %q, want 200 %q (call next!)", rec.Code, rec.Body.String(), "<h1>converted</h1>")
+    	if got := c("# Hi"); got != "<h1>Hi</h1>" {
+    		t.Errorf("recoverPanics(...)(markdownToHTML)(%q) = %q, want %q", "# Hi", got, "<h1>Hi</h1>")
+    	}
+    	if len(logs) != 0 {
+    		t.Errorf("logged %q for a conversion that didn't panic, want nothing", logs)
     	}
 
-    	rec = httptest.NewRecorder()
-    	h.ServeHTTP(rec, httptest.NewRequest("POST", "/convert?fmt=pdf", nil))
-    	if rec.Code != http.StatusNotImplemented {
-    		t.Errorf("wrapped handler responded %d, want %d", rec.Code, http.StatusNotImplemented)
-    	}
-
-    	want := []string{"GET /convert -> 200", "POST /convert -> 501"}
+    	func() {
+    		defer func() {
+    			if r := recover(); r != nil {
+    				t.Fatalf("the panic escaped recoverPanics: %v", r)
+    			}
+    		}()
+    		if got := c("%PDF-1.7"); got != "<!-- conversion failed -->" {
+    			t.Errorf("after a panic the converter returned %q, want %q", got, "<!-- conversion failed -->")
+    		}
+    	}()
+    	want := []string{"panic: PDF input not supported"}
     	if !slices.Equal(logs, want) {
     		t.Errorf("logged %q, want %q", logs, want)
     	}
     }
 
-    func TestLogRequestsLogsAfterHandler(t *testing.T) {
-    	var events []string
-    	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-    		events = append(events, "handler")
-    		w.WriteHeader(http.StatusAccepted)
-    	})
-    	h := logRequests(func(s string) { events = append(events, s) })(inner)
-    	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("PUT", "/docs/1", nil))
-    	want := []string{"handler", "PUT /docs/1 -> 202"}
-    	if !slices.Equal(events, want) {
-    		t.Errorf("events = %q, want %q (log after the handler runs)", events, want)
-    	}
-    }
-
-    func tag(name string, events *[]string) Middleware {
-    	return func(next http.Handler) http.Handler {
-    		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-    			*events = append(*events, "enter "+name)
-    			next.ServeHTTP(w, r)
-    			*events = append(*events, "leave "+name)
-    		})
-    	}
-    }
-
-    func TestChain(t *testing.T) {
-    	var events []string
-    	final := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-    		events = append(events, "handler")
-    	})
-    	h := Chain(final, tag("A", &events), tag("B", &events), tag("C", &events))
-    	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
-    	want := []string{"enter A", "enter B", "enter C", "handler", "leave C", "leave B", "leave A"}
-    	if !slices.Equal(events, want) {
-    		t.Errorf("Chain order:\n got %q\nwant %q", events, want)
-    	}
-
-    	events = nil
-    	Chain(final).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
-    	if fmt.Sprint(events) != "[handler]" {
-    		t.Errorf("Chain with no middleware ran %q, want just the handler", events)
+    func TestFullChain(t *testing.T) {
+    	var logs []string
+    	logf := func(s string) { logs = append(logs, s) }
+    	c := Chain(markdownToHTML, recoverPanics(logf), logSizes("md->html", logf))
+    	c("# Hello")
+    	c("%PDF-1.7")
+    	want := []string{"md->html: 7 bytes -> 14 bytes", "panic: PDF input not supported"}
+    	if !slices.Equal(logs, want) {
+    		t.Errorf("logs = %q, want %q", logs, want)
     	}
     }
 ---
 
-Doc2Doc's web API needs an access log. Every request should produce one line like
-`POST /convert -> 200` **after** the handler has finished, so the status is known.
+Doc2Doc converts whole folders of documents in one batch. Two things keep going
+wrong: nobody can tell which converters are slow or bloated, and one bad file (a PDF
+sneaking in among the Markdown) panics and kills the entire batch.
+
+Both fixes belong in middleware, not in the converters.
 
 ## Your task
 
-1. Finish `logRequests(logf)`. It returns a `Middleware` that:
-   - wraps the `ResponseWriter` in the provided `statusRecorder`, starting its `status`
-     at `http.StatusOK`,
-   - calls the next handler with the recorder,
-   - then calls `logf` with `"METHOD PATH -> STATUS"`, using `r.URL.Path` (no query
-     string).
-2. Finish `Chain(h, mws...)` so the **first** middleware in the list is the outermost
-   layer and sees each request first.
+`Converter`, `Middleware` and `Chain` are already written. Finish two configurable
+middlewares, each taking a `logf func(string)` so the caller decides where log lines
+go (the tests collect them in a slice):
+
+1. **`logSizes(name, logf)`** returns a `Middleware` that calls the next converter,
+   then calls `logf` with `"NAME: IN bytes -> OUT bytes"`, for example
+   `md->html: 7 bytes -> 14 bytes`. It returns the converter's result unchanged.
+2. **`recoverPanics(logf)`** returns a `Middleware` that calls the next converter but
+   stops a panic from escaping. If one happens, it calls `logf` with
+   `"panic: "` followed by the panic value, and the converter returns
+   `<!-- conversion failed -->`. Normal conversions pass through untouched and log
+   nothing.
 
 ```go
-h := Chain(convertHandler, recoverPanics, logRequests(logf), requireToken(tok))
-// request -> recoverPanics -> logRequests -> requireToken -> convertHandler
+convert := Chain(markdownToHTML, recoverPanics(logf), logSizes("md->html", logf))
 ```
 
 ## Tips
 
-- A handler can't tell you what status it sent. `statusRecorder` embeds the real
-  `ResponseWriter` and overrides `WriteHeader` so it can remember the code. Handlers
-  that never call `WriteHeader` send 200, which is why you start there.
-- Wrap your function literal in `http.HandlerFunc(...)` to turn it into an
-  `http.Handler`.
-- `slices.Backward` walks a slice from the end, which makes `Chain` short.
+- Use `len(doc)` and `len(out)` for the byte counts.
+- A deferred function can change what the surrounding function returns only through
+  a **named result**: `return func(doc string) (out string) { defer ...; return next(doc) }`.
+- `fmt.Sprint("panic: ", r)` turns any panic value into a string.
+- `recoverPanics` is first in the `Chain`, so it's the outermost layer. When the PDF
+  panics, `logSizes` never gets to log, and that's expected.

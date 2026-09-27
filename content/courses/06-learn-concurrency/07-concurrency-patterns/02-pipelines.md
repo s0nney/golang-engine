@@ -107,7 +107,8 @@ exercise:
     	for range 4 {
     		fmt.Println(<-quotes)
     	}
-    	cancel() // we have enough quotes: stop the pipeline
+    	time.Sleep(10 * time.Millisecond) // meanwhile, the stages fill up with more work
+    	cancel()                          // we have enough quotes: stop the pipeline
 
     	time.Sleep(50 * time.Millisecond)
     	fmt.Println("goroutines left behind:", runtime.NumGoroutine()-before)
@@ -192,7 +193,8 @@ exercise:
     	for range 4 {
     		fmt.Println(<-quotes)
     	}
-    	cancel() // we have enough quotes: stop the pipeline
+    	time.Sleep(10 * time.Millisecond) // meanwhile, the stages fill up with more work
+    	cancel()                          // we have enough quotes: stop the pipeline
 
     	time.Sleep(50 * time.Millisecond)
     	fmt.Println("goroutines left behind:", runtime.NumGoroutine()-before)
@@ -250,7 +252,8 @@ exercise:
     	for range 3 {
     		<-quotes
     	}
-    	cancel() // the consumer walks away without draining quotes
+    	time.Sleep(10 * time.Millisecond) // let every stage block on a send
+    	cancel()                          // the consumer walks away without draining quotes
 
     	if n := settled(before); n > before {
     		t.Errorf("after cancelling, %d pipeline goroutine(s) are still running: a stage is stuck sending to a consumer that left (watch ctx.Done() when sending)", n-before)

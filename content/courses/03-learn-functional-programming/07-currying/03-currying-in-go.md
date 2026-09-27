@@ -16,7 +16,7 @@ quiz:
     options:
       - text: '`render(cfg)(tmpl)(page)(w)(r)` with five levels of nested function types'
         correct: true
-      - text: '`func handleConvert(store Store) http.HandlerFunc`'
+      - text: '`func newConverter(glossary map[string]string) func(string) string`'
       - text: '`slices.DeleteFunc(lines, hasPrefix("//"))`'
     explanation: |
       One level of "configure, then return a function" is idiomatic Go. Deeply
@@ -30,8 +30,8 @@ So far, currying might seem like a party trick. In Go it has one killer use:
 ## Fitting the shape
 
 Tons of Go APIs take a function with a fixed signature: `slices.ContainsFunc` wants
-`func(E) bool`, `strings.FieldsFunc` wants `func(rune) bool`, and `http.Handle` wants
-an `http.Handler`. Your logic often needs extra information that doesn't fit into
+`func(E) bool`, `strings.FieldsFunc` wants `func(rune) bool`, and `strings.Map` wants
+`func(rune) rune`. Your logic often needs extra information that doesn't fit into
 that signature. So you take the extra information first and return a function of the
 right shape:
 
@@ -82,26 +82,38 @@ true
 `slices.Clone` before `DeleteFunc`: `DeleteFunc` modifies the slice you give it, and
 we don't want to wreck `lines`.)
 
-## Dependency injection for handlers
+## Dependencies first, input later
 
-The biggest real-world use: HTTP handlers. A handler must have the signature
-`func(http.ResponseWriter, *http.Request)`, with no room for a database or config.
-So you take those first:
+The biggest real-world use: giving a function the settings or dependencies it needs
+while keeping the shape the rest of the program expects. Doc2Doc's conversion steps
+are all `func(string) string`, with no room for a glossary or a word limit. So you
+take those first:
 
 ```go
-func handleConvert(store DocStore, maxSize int64) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, maxSize)
-		// ...use store to load and convert the document...
+func newConverter(glossary map[string]string, maxWords int) func(string) string {
+	return func(doc string) string {
+		words := strings.Fields(doc)
+		if len(words) > maxWords {
+			words = words[:maxWords]
+		}
+		for i, w := range words {
+			if full, ok := glossary[w]; ok {
+				words[i] = full
+			}
+		}
+		return strings.Join(words, " ")
 	}
 }
 
-mux.Handle("POST /convert", handleConvert(store, 10<<20))
+convert := newConverter(map[string]string{"FP": "functional programming"}, 500)
+fmt.Println(convert("FP is fun"))
+// functional programming is fun
 ```
 
-That's one level of currying: dependencies first, request later. It's the standard
-way to structure Go web servers, and it makes handlers trivial to test with a fake
-store.
+That's one level of currying: dependencies first, input later. You'll see exactly
+this pattern again for HTTP handlers in Learn HTTP Servers, where a handler takes its
+database and config first and the request later. It also makes the returned function
+trivial to test: pass in a small fake glossary.
 
 ## Where to stop
 

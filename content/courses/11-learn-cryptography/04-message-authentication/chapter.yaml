@@ -1,0 +1,2 @@
+title: Message Authentication
+description: Why a hash isn't a MAC, HMAC and its test vectors, timing leaks and constant-time comparison, verifying MACs without leaving gaps, and keeping keys to one purpose each.

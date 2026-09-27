@@ -46,6 +46,8 @@ quiz:
 
 "Is it fast enough?" is a question you should answer with measurements, not intuition. Go has benchmarks built into the `testing` package, right next to your tests.
 
+You met `b.Loop` briefly in [Data Structures and Algorithms 1](/courses/learn-algorithms/big-o-analysis/benchmarking), timing sorts. This chapter goes further: allocations, comparing runs properly, and the traps that make benchmark numbers lie.
+
 ## A first benchmark
 
 A benchmark is a function in a `_test.go` file named `BenchmarkXxx` that takes a `*testing.B`:

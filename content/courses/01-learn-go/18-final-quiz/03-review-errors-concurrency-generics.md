@@ -63,6 +63,118 @@ quiz:
       `>` needs an ordered type. `cmp.Ordered` covers integers, floats and
       strings. `comparable` only allows `==` and `!=`, and `any` allows
       neither.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"errors"
+    	"fmt"
+    	"strings"
+    )
+
+    var ErrInvalidPhone = errors.New("invalid phone number")
+
+    func checkPhone(phone string) error {
+    	if !strings.HasPrefix(phone, "+") {
+    		return ErrInvalidPhone
+    	}
+    	return nil
+    }
+
+    // firstFailure runs check on every item and returns how many failed, plus
+    // the first failure wrapped as "item <index>: <error>" (nil if none failed).
+    func firstFailure(items []string, check func(string) error) (int, error) {
+    	// ?
+    	return 0, nil
+    }
+
+    func main() {
+    	phones := []string{"+1-555-0100", "555-0199", "+44-20-7946-0000", "0800"}
+    	n, err := firstFailure(phones, checkPhone)
+    	fmt.Println(n, err, errors.Is(err, ErrInvalidPhone))
+    }
+  solution: |
+    package main
+
+    import (
+    	"errors"
+    	"fmt"
+    	"strings"
+    )
+
+    var ErrInvalidPhone = errors.New("invalid phone number")
+
+    func checkPhone(phone string) error {
+    	if !strings.HasPrefix(phone, "+") {
+    		return ErrInvalidPhone
+    	}
+    	return nil
+    }
+
+    func firstFailure[T any](items []T, check func(T) error) (int, error) {
+    	failed := 0
+    	var first error
+    	for i, item := range items {
+    		if err := check(item); err != nil {
+    			if first == nil {
+    				first = fmt.Errorf("item %d: %w", i, err)
+    			}
+    			failed++
+    		}
+    	}
+    	return failed, first
+    }
+
+    func main() {
+    	phones := []string{"+1-555-0100", "555-0199", "+44-20-7946-0000", "0800"}
+    	n, err := firstFailure(phones, checkPhone)
+    	fmt.Println(n, err, errors.Is(err, ErrInvalidPhone))
+    }
+  tests: |
+    package main
+
+    import (
+    	"errors"
+    	"testing"
+    )
+
+    func TestFirstFailurePhones(t *testing.T) {
+    	phones := []string{"+1-555-0100", "555-0199", "+44-20-7946-0000", "0800"}
+    	n, err := firstFailure(phones, checkPhone)
+    	if n != 2 {
+    		t.Errorf("firstFailure(%q) count = %d, want 2", phones, n)
+    	}
+    	if err == nil || err.Error() != "item 1: invalid phone number" {
+    		t.Errorf(`firstFailure(%q) error = %v, want "item 1: invalid phone number"`, phones, err)
+    	}
+    	if !errors.Is(err, ErrInvalidPhone) {
+    		t.Errorf("errors.Is(err, ErrInvalidPhone) = false; wrap the error with %%w")
+    	}
+
+    	n, err = firstFailure([]string{"+1", "+2"}, checkPhone)
+    	if n != 0 || err != nil {
+    		t.Errorf(`firstFailure(["+1" "+2"]) = %d, %v; want 0, <nil>`, n, err)
+    	}
+    }
+
+    var errTooBig = errors.New("too many segments")
+
+    func TestFirstFailureGeneric(t *testing.T) {
+    	segments := []int{1, 5, 2, 9, 4}
+    	n, err := firstFailure(segments, func(s int) error {
+    		if s > 3 {
+    			return errTooBig
+    		}
+    		return nil
+    	})
+    	if n != 3 || err == nil || err.Error() != "item 1: too many segments" || !errors.Is(err, errTooBig) {
+    		t.Errorf("firstFailure(%v, s > 3) = %d, %v; want 3, item 1: too many segments", segments, n, err)
+    	}
+    	if n, err := firstFailure([]int(nil), func(int) error { return errTooBig }); n != 0 || err != nil {
+    		t.Errorf("firstFailure(nil) = %d, %v; want 0, <nil>", n, err)
+    	}
+    }
 ---
 
 The last review covers the chapters that make Go feel like *Go*: errors as values, packages and tests, goroutines and channels, and generics.
@@ -152,4 +264,39 @@ The key ideas from these chapters:
 - Shared data needs a mutex; run `-race` to catch mistakes.
 - Generics let you write one function for many types. Pick the loosest constraint that works.
 
-That's the course. Well done, and welcome to Go!
+## Your turn
+
+One last exercise that mixes errors and generics. Complete `firstFailure`:
+
+1. Call `check` on every item. Count how many return a non-nil error.
+2. Remember only the **first** failure, wrapped with its index:
+   `fmt.Errorf("item %d: %w", i, err)`. Using `%w` keeps `errors.Is` working.
+3. Return the count and that wrapped error (`nil` if nothing failed).
+4. Then make it **generic**: `func firstFailure[T any](items []T, check func(T) error) (int, error)`.
+   **Submit** also calls it with a `[]int`.
+
+**Run** should print `2 item 1: invalid phone number true`.
+
+## You made it!
+
+That's the end of **Learn Go**. Look back at how far you've come: you started by
+printing one line of text, and you finished by building the Textio message report, a
+real command-line tool that reads a file, counts and sorts words, handles errors
+and takes flags. Along the way you learned variables, functions, loops, slices,
+maps, structs, pointers, errors, packages, tests, goroutines and generics.
+
+A few habits to keep:
+
+- Write small programs often. The terminal version of the message report is a great
+  thing to extend: add a `-min` flag, count emoji, or print a bar chart with
+  `strings.Repeat`.
+- Read error messages carefully, top to bottom, and trust the compiler.
+- Run `go fmt`, `go vet` and `go test` before you call anything done.
+
+## What's next
+
+So far your programs have been a handful of functions and structs. As programs grow,
+you need better ways to organize them. Next up is
+[Learn Object-Oriented Programming in Go](/courses/learn-oop), where you'll use
+methods, interfaces and composition to design types that fit together cleanly.
+See you there, and welcome to Go!

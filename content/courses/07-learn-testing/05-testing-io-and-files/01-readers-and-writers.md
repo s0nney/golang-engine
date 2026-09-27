@@ -29,6 +29,194 @@ quiz:
       assumes one `Read` fills the buffer works on small strings and
       breaks on real connections. `OneByteReader` returns one byte per
       call and exposes that bug.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"errors"
+    	"fmt"
+    	"io"
+    	"strconv"
+    	"strings"
+    	"testing/iotest"
+    )
+
+    // SumCents adds up amounts in cents, one per line, ignoring blank lines.
+    // It fails if a line isn't a whole number, or if reading r fails.
+    func SumCents(r io.Reader) (Cents, error) {
+    	buf := make([]byte, 4096)
+    	n, err := r.Read(buf)
+    	if err != nil {
+    		return 0, err
+    	}
+    	var total Cents
+    	for _, line := range strings.Split(string(buf[:n]), "\n") {
+    		if line == "" {
+    			continue
+    		}
+    		c, err := strconv.ParseInt(line, 10, 64)
+    		if err != nil {
+    			return 0, fmt.Errorf("bad amount %q", line)
+    		}
+    		total += Cents(c)
+    	}
+    	return total, nil
+    }
+
+    // ---- Ledgerly code ----
+
+    // Cents is an amount of money in cents.
+    type Cents int64
+
+    func main() {
+    	const input = "-120000\n5000\n\n-1500\n"
+    	for _, tc := range []struct {
+    		name string
+    		r    io.Reader
+    	}{
+    		{"strings.Reader", strings.NewReader(input)},
+    		{"OneByteReader", iotest.OneByteReader(strings.NewReader(input))},
+    		{"DataErrReader", iotest.DataErrReader(strings.NewReader(input))},
+    		{"TimeoutReader", iotest.TimeoutReader(strings.NewReader(input))},
+    		{"ErrReader", iotest.ErrReader(errors.New("disk on fire"))},
+    	} {
+    		total, err := SumCents(tc.r)
+    		fmt.Printf("%-15s total=%d err=%v\n", tc.name, total, err)
+    	}
+    }
+  solution: |
+    package main
+
+    import (
+    	"bufio"
+    	"errors"
+    	"fmt"
+    	"io"
+    	"strconv"
+    	"strings"
+    	"testing/iotest"
+    )
+
+    // SumCents adds up amounts in cents, one per line, ignoring blank lines.
+    // It fails if a line isn't a whole number, or if reading r fails.
+    func SumCents(r io.Reader) (Cents, error) {
+    	var total Cents
+    	sc := bufio.NewScanner(r)
+    	for line := 1; sc.Scan(); line++ {
+    		text := strings.TrimSpace(sc.Text())
+    		if text == "" {
+    			continue
+    		}
+    		c, err := strconv.ParseInt(text, 10, 64)
+    		if err != nil {
+    			return 0, fmt.Errorf("line %d: bad amount %q", line, text)
+    		}
+    		total += Cents(c)
+    	}
+    	if err := sc.Err(); err != nil {
+    		return 0, fmt.Errorf("reading amounts: %w", err)
+    	}
+    	return total, nil
+    }
+
+    // ---- Ledgerly code ----
+
+    // Cents is an amount of money in cents.
+    type Cents int64
+
+    func main() {
+    	const input = "-120000\n5000\n\n-1500\n"
+    	for _, tc := range []struct {
+    		name string
+    		r    io.Reader
+    	}{
+    		{"strings.Reader", strings.NewReader(input)},
+    		{"OneByteReader", iotest.OneByteReader(strings.NewReader(input))},
+    		{"DataErrReader", iotest.DataErrReader(strings.NewReader(input))},
+    		{"TimeoutReader", iotest.TimeoutReader(strings.NewReader(input))},
+    		{"ErrReader", iotest.ErrReader(errors.New("disk on fire"))},
+    	} {
+    		total, err := SumCents(tc.r)
+    		fmt.Printf("%-15s total=%d err=%v\n", tc.name, total, err)
+    	}
+    }
+  tests: |
+    package main
+
+    import (
+    	"errors"
+    	"io"
+    	"strings"
+    	"testing"
+    	"testing/iotest"
+    )
+
+    const input = "-120000\n5000\n\n-1500\n"
+
+    func TestSumCentsWellBehaved(t *testing.T) {
+    	for _, tc := range []struct {
+    		in   string
+    		want Cents
+    	}{
+    		{input, -116500},
+    		{"", 0},
+    		{"42", 42},
+    		{"7\r\n8\r\n", 15},
+    	} {
+    		got, err := SumCents(strings.NewReader(tc.in))
+    		if err != nil || got != tc.want {
+    			t.Errorf("SumCents(%q) = %d, %v; want %d, nil", tc.in, got, err, tc.want)
+    		}
+    	}
+    }
+
+    func TestSumCentsLargeInput(t *testing.T) {
+    	in := strings.Repeat("100\n", 5000) // 20,000 bytes
+    	got, err := SumCents(strings.NewReader(in))
+    	if err != nil || got != 500000 {
+    		t.Errorf("SumCents(5000 lines of \"100\") = %d, %v; want 500000, nil (does one Read get everything?)", got, err)
+    	}
+    }
+
+    func TestSumCentsAwkwardReaders(t *testing.T) {
+    	for _, tc := range []struct {
+    		name string
+    		wrap func(io.Reader) io.Reader
+    		hint string
+    	}{
+    		{"iotest.OneByteReader", iotest.OneByteReader, "a single Read may return just one byte"},
+    		{"iotest.HalfReader", iotest.HalfReader, "a single Read may return only part of the data"},
+    		{"iotest.DataErrReader", iotest.DataErrReader, "the last Read can return data and io.EOF together"},
+    	} {
+    		got, err := SumCents(tc.wrap(strings.NewReader(input)))
+    		if err != nil || got != -116500 {
+    			t.Errorf("SumCents(%s(%q)) = %d, %v; want -116500, nil (%s)", tc.name, input, got, err, tc.hint)
+    		}
+    	}
+    }
+
+    func TestSumCentsReadErrors(t *testing.T) {
+    	boom := errors.New("disk on fire")
+    	_, err := SumCents(iotest.ErrReader(boom))
+    	if !errors.Is(err, boom) {
+    		t.Errorf("SumCents(iotest.ErrReader(boom)) error = %v; want an error wrapping boom (use %%w)", err)
+    	} else if err.Error() == boom.Error() {
+    		t.Errorf("SumCents(iotest.ErrReader(boom)) error = %q; wrap it with some context, e.g. fmt.Errorf(\"reading amounts: %%w\", err)", err)
+    	}
+
+    	got, err := SumCents(iotest.TimeoutReader(strings.NewReader(input)))
+    	if !errors.Is(err, iotest.ErrTimeout) {
+    		t.Errorf("SumCents(iotest.TimeoutReader(...)) = %d, %v; the second Read fails, so want an error wrapping iotest.ErrTimeout, not a partial total", got, err)
+    	}
+    }
+
+    func TestSumCentsBadLine(t *testing.T) {
+    	_, err := SumCents(strings.NewReader("5\n12.50\n"))
+    	if err == nil || !strings.Contains(err.Error(), "line 2") {
+    		t.Errorf("SumCents(%q) error = %v; want an error that mentions \"line 2\"", "5\n12.50\n", err)
+    	}
+    }
 ---
 
 Ledgerly's CSV import and statement printing do I/O. The previous chapter's advice applies directly: don't let the function open files or write to the terminal itself. Take the most general interface that does the job, and in Go that's nearly always `io.Reader` or `io.Writer`.
@@ -135,3 +323,16 @@ Many functions forget to check `Fprintf`'s error. That doesn't matter for `os.St
 ## Readers you can inspect
 
 Sometimes you want to see what code *did* with a reader or writer. `iotest.NewReadLogger(prefix, r)` and `iotest.NewWriteLogger(prefix, w)` log every call through the `log` package, which is handy when debugging a protocol. And `io.MultiWriter(&buf, os.Stdout)` copies output to a buffer while still showing it, if you want to watch a test run.
+
+## Your turn: survive awkward readers
+
+`SumCents` in the editor adds up one amount (in cents) per line. It passes a test with `strings.NewReader`, and it's still badly broken. It calls `Read` once and assumes that returns everything. It treats an `err` that arrives *with* data as a reason to drop the data. It also returns read errors with no context.
+
+Rewrite it so it works with **any** `io.Reader`:
+
+- Read line by line with a `bufio.Scanner`, which loops over `Read` for you and handles data that arrives together with `io.EOF`. (Reading everything with `io.ReadAll` first also works.)
+- Trim spaces from each line (this also removes the `\r` of Windows line endings) and skip blank lines.
+- For a line that isn't a whole number, return an error that mentions its line number, like `line 2: bad amount "12.50"`.
+- If reading fails, return that error wrapped with context using `%w`, and no partial total. Check `sc.Err()` after the loop.
+
+The grader feeds your function through `iotest.OneByteReader`, `HalfReader`, `DataErrReader`, `TimeoutReader` and `ErrReader`, plus an input bigger than the starter's buffer. **Run** shows what each reader does to the current code.

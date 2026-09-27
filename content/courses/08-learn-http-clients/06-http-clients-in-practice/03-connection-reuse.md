@@ -24,7 +24,7 @@ quiz:
       Closing an unread body now drains it asynchronously, up to a conservative limit
       (256 KiB and 50 ms in the current source). Small error bodies no longer cost you
       the connection. You still have to call `Close`.
-  - question: Which mistake stops **every** later request from reusing a connection?
+  - question: Which mistake means a connection can **never** go back into the pool?
     options:
       - text: Not reading a small body before closing it
       - text: Never calling `resp.Body.Close()`

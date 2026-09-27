@@ -1,0 +1,2 @@
+title: Certificates and TLS
+description: What's inside an X.509 certificate, running your own CA with crypto/x509, verifying chains properly, configuring crypto/tls, and mutual TLS so only enrolled Keybox devices can connect.

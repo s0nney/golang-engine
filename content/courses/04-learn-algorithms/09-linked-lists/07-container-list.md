@@ -166,7 +166,7 @@ reorders it in O(1). Neither structure could do both alone.
 
 ## Wrapping up
 
-That's the end of Data Structures and Algorithms 1. You can now:
+You've nearly finished Data Structures and Algorithms 1. You can now:
 
 - measure algorithms with **Big O** and confirm it with **benchmarks**,
 - write and compare **five sorting algorithms**, and know what `slices.Sort` does,
@@ -174,8 +174,8 @@ That's the end of Data Structures and Algorithms 1. You can now:
 - and build **stacks**, **queues**, **ring buffers** and **linked lists**,
   generic and iterable, from scratch.
 
-Next up is [Data Structures and Algorithms 2](/courses/learn-data-structures), which builds
-on these foundations with trees, hashmaps, tries, heaps and graphs.
+Before you move on, there's one last job: putting several of these pieces
+together in a real Clout feature.
 
 ## Further reading
 

@@ -14,10 +14,13 @@ All in `internal/web/views/views.templ`. After editing it, run `templ generate` 
 | Component | Used for |
 |---|---|
 | `layout` | `<html>` shell: header, footer, stylesheet, `htmx.min.js`, `activity.js`. |
-| `Home` | Roadmap page: intro, `Activity`, the ordered course list with progress bars, "Reset my progress". |
+| `Home` | Roadmap page: intro, `Activity`, the core courses, then a "Beyond the core" heading and the `track: beyond` courses (numbering continues), each with a progress bar; "Reset my progress". |
+| `roadmap` | One numbered course list; `start` lets the second list continue the first one's numbering. |
 | `Activity` | Streak stats (current, best, today) and the 26-week heatmap with legend. |
 | `Course` | Course outline: chapters, lessons with ✓ marks, "Start"/"Continue" link. |
-| `LessonPage` | Two-column lesson: article on the left; exercise and quiz panels on the right (stacked on narrow screens). Prev/next pager. |
+| `LessonPage` | Two-column lesson: article on the left; exercise and quiz panels on the right (stacked on narrow screens). |
+| `lessonNav` | Compact "← Previous" / "Next →" buttons beside the lesson counter at the top of every lesson. |
+| `pager` | Full-width Previous and Next buttons under every lesson, each showing the target lesson's title. At a course's first or last lesson they continue into the neighbouring course ("Next course: …"); after the final course, Next returns to the roadmap. Stacks on narrow screens with Next first. |
 | `exercise` / `Exercise` | Code form with Run, Submit and Reset code. `Exercise` is the htmx fragment for Reset. |
 | `Output` | Result of Run/Submit: verdict line, output (or Expected vs Your output), "Next lesson →" on a pass, and an out-of-band `#lesson-status` update. |
 | `quiz` | Radio-button quiz; after grading shows right/wrong per question and explanations. |

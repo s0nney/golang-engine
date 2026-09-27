@@ -1,0 +1,2 @@
+title: Digital Signatures
+description: What a signature proves and what it doesn't, Ed25519 with RFC 8032 test vectors, ECDSA, RSA and post-quantum ML-DSA, signing exactly the bytes you mean, and verifying signed releases.

@@ -1,0 +1,2 @@
+title: Type Inference
+description: How Go works out type arguments for you, from function arguments, untyped constants and constraints, and what to do when it can't.

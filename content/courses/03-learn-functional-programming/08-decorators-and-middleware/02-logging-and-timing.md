@@ -129,4 +129,4 @@ Go's generics can't abstract over *how many* parameters a function has. `Logged`
 works for `func(In) Out`, but a `func(string, int) (string, error)` needs its own
 wrapper (or you bundle the arguments into a struct). Wrappers in Go are usually
 written for one well-known signature, which is exactly what the next lesson's
-`http.Handler` gives you.
+`Converter` type gives you.

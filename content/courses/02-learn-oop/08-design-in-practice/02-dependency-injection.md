@@ -23,6 +23,142 @@ quiz:
       When a function reaches out to a hidden global dependency, the test can't
       control it. Inject a `Roller` interface instead, and tests can pass dice that
       always roll 20 or always roll 1.
+exercise:
+  starter: |
+    package main
+
+    import (
+    	"fmt"
+    	"math/rand/v2"
+    )
+
+    type Roller interface {
+    	Roll(sides int) int
+    }
+
+    // RandomDice is the real implementation.
+    type RandomDice struct{}
+
+    func (RandomDice) Roll(sides int) int { return rand.IntN(sides) + 1 }
+
+    type Dragon struct {
+    	name string
+    	dice Roller
+    }
+
+    // NewDragon should store the dice it's given.
+    func NewDragon(name string, dice Roller) *Dragon {
+    	return &Dragon{name: name}
+    }
+
+    // FireBreath rolls three 6-sided dice and returns their sum. If all
+    // three dice show the same number it's an inferno: double the sum.
+    //
+    // It should roll with d.dice, not reach for math/rand itself.
+    func (d *Dragon) FireBreath() int {
+    	a, b, c := rand.IntN(6)+1, rand.IntN(6)+1, rand.IntN(6)+1
+    	sum := a + b + c
+    	if a == b && b == c {
+    		return sum * 2
+    	}
+    	return sum
+    }
+
+    func main() {
+    	smaug := NewDragon("Smaug", RandomDice{})
+    	dmg := smaug.FireBreath()
+    	fmt.Println("damage in range?", dmg >= 3 && dmg <= 36)
+    }
+  solution: |
+    package main
+
+    import (
+    	"fmt"
+    	"math/rand/v2"
+    )
+
+    type Roller interface {
+    	Roll(sides int) int
+    }
+
+    // RandomDice is the real implementation.
+    type RandomDice struct{}
+
+    func (RandomDice) Roll(sides int) int { return rand.IntN(sides) + 1 }
+
+    type Dragon struct {
+    	name string
+    	dice Roller
+    }
+
+    func NewDragon(name string, dice Roller) *Dragon {
+    	return &Dragon{name: name, dice: dice}
+    }
+
+    // FireBreath rolls three 6-sided dice and returns their sum. If all
+    // three dice show the same number it's an inferno: double the sum.
+    func (d *Dragon) FireBreath() int {
+    	a, b, c := d.dice.Roll(6), d.dice.Roll(6), d.dice.Roll(6)
+    	sum := a + b + c
+    	if a == b && b == c {
+    		return sum * 2
+    	}
+    	return sum
+    }
+
+    func main() {
+    	smaug := NewDragon("Smaug", RandomDice{})
+    	dmg := smaug.FireBreath()
+    	fmt.Println("damage in range?", dmg >= 3 && dmg <= 36)
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    // scripted is a fake Roller that returns pre-set rolls and records
+    // how it was used.
+    type scripted struct {
+    	rolls []int
+    	sides []int
+    }
+
+    func (s *scripted) Roll(sides int) int {
+    	s.sides = append(s.sides, sides)
+    	if len(s.rolls) == 0 {
+    		return 1
+    	}
+    	r := s.rolls[0]
+    	s.rolls = s.rolls[1:]
+    	return r
+    }
+
+    func TestFireBreath(t *testing.T) {
+    	for _, tt := range []struct {
+    		rolls []int
+    		want  int
+    	}{
+    		{[]int{1, 2, 3}, 6},
+    		{[]int{6, 5, 6}, 17},
+    		{[]int{4, 4, 4}, 24},
+    		{[]int{1, 1, 1}, 6},
+    		{[]int{2, 2, 5}, 9},
+    	} {
+    		dice := &scripted{rolls: append([]int(nil), tt.rolls...)}
+    		d := NewDragon("Smaug", dice)
+    		if got := d.FireBreath(); got != tt.want {
+    			t.Errorf("FireBreath() with rolls %v = %d, want %d (is the Dragon using the injected dice?)", tt.rolls, got, tt.want)
+    		}
+    		if len(dice.sides) != 3 {
+    			t.Errorf("FireBreath() rolled the injected dice %d times, want 3", len(dice.sides))
+    		}
+    		for _, s := range dice.sides {
+    			if s != 6 {
+    				t.Errorf("FireBreath() called Roll(%d), want Roll(6)", s)
+    			}
+    		}
+    	}
+    }
 ---
 
 Our combat system rolls dice. The quick way is to call the random number generator straight from the code:
@@ -169,6 +305,15 @@ borin := NewHero("Borin", 12, func(n int) int { return rand.IntN(n) + 1 })
 ```
 
 Both are fine. Use an interface when there are several related methods or the implementation carries state (like `FixedDice`); use a function when there's just one operation.
+
+## Your turn
+
+The dragon's `FireBreath` reaches straight for `math/rand`, so nobody can test that an inferno (three matching dice) really doubles the damage. Refactor it:
+
+1. Make `NewDragon` store the `Roller` it's given.
+2. Make `FireBreath` roll three 6-sided dice **through `d.dice`**, returning their sum, doubled if all three match.
+
+The tests inject their own scripted dice (you won't see that type), which is exactly the point of injection.
 
 ## Further reading
 

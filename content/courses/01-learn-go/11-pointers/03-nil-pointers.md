@@ -38,6 +38,83 @@ quiz:
     explanation: |
       A guard clause that handles `nil` first keeps the rest of the function
       safe. `*u` is also a dereference, so it panics just the same.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    type user struct {
+    	name    string
+    	credits int
+    }
+
+    // totalCredits adds up the credits of every user, skipping nil pointers.
+    func totalCredits(users []*user) int {
+    	total := 0
+    	for _, u := range users {
+    		total += u.credits
+    	}
+    	return total
+    }
+
+    func main() {
+    	users := []*user{{name: "alice", credits: 12}, nil, {name: "bob", credits: 3}}
+    	fmt.Println(totalCredits(users))
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    type user struct {
+    	name    string
+    	credits int
+    }
+
+    func totalCredits(users []*user) int {
+    	total := 0
+    	for _, u := range users {
+    		if u == nil {
+    			continue
+    		}
+    		total += u.credits
+    	}
+    	return total
+    }
+
+    func main() {
+    	users := []*user{{name: "alice", credits: 12}, nil, {name: "bob", credits: 3}}
+    	fmt.Println(totalCredits(users))
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestTotalCredits(t *testing.T) {
+    	for _, tc := range []struct {
+    		name  string
+    		users []*user
+    		want  int
+    	}{
+    		{"no nils", []*user{{"alice", 12}, {"bob", 3}}, 15},
+    		{"nil in the middle", []*user{{"alice", 12}, nil, {"bob", 3}}, 15},
+    		{"only nils", []*user{nil, nil}, 0},
+    		{"nil slice", nil, 0},
+    	} {
+    		t.Run(tc.name, func(t *testing.T) {
+    			defer func() {
+    				if r := recover(); r != nil {
+    					t.Fatalf("totalCredits panicked: %v (did you check for nil?)", r)
+    				}
+    			}()
+    			if got := totalCredits(tc.users); got != tc.want {
+    				t.Errorf("totalCredits = %d, want %d", got, tc.want)
+    			}
+    		})
+    	}
+    }
 ---
 
 A pointer can point at nothing. Its value is then `nil`. Following a nil pointer is the most famous crash in Go, and in plenty of other languages too. The inventor of the null reference, Tony Hoare, called it his "billion-dollar mistake".
@@ -159,6 +236,14 @@ Don't rely on this everywhere, but it's a neat trick for types where "nothing" h
 ## Prefer values when you can
 
 Every pointer is a potential nil. So don't use pointers just because you can. If a function only needs to *read* a small struct, pass it by value: a value can never be nil. Use pointers when you need to share or modify, or when "no value" is a meaningful answer.
+
+## Your turn
+
+Textio's user list can contain `nil` entries for accounts that were deleted.
+Press **Run** and read the panic: which line does the stack trace point at?
+
+Fix `totalCredits` with a guard clause so it skips `nil` users instead of
+crashing. **Run** should then print `15`.
 
 ## Further reading
 

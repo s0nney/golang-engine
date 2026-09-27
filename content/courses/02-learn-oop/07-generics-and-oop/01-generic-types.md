@@ -42,6 +42,173 @@ quiz:
     explanation: |
       For `Stack[string]`, `T` is `string`, so `var zero T` is the empty string.
       `%q` prints it as `""`. The length check stops the out-of-range slice access.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // Stack is a last-in, first-out pile of values.
+    type Stack[T any] struct {
+    	items []T
+    }
+
+    // Push puts v on top of the stack.
+    func (s *Stack[T]) Push(v T) {
+    	// ?
+    }
+
+    // Pop removes and returns the top value. On an empty stack it returns
+    // the zero value of T and false.
+    func (s *Stack[T]) Pop() (T, bool) {
+    	var zero T
+    	// ?
+    	return zero, false
+    }
+
+    // Peek returns the top value without removing it, or (zero, false)
+    // on an empty stack.
+    func (s *Stack[T]) Peek() (T, bool) {
+    	var zero T
+    	// ?
+    	return zero, false
+    }
+
+    // Len reports how many values are on the stack.
+    func (s *Stack[T]) Len() int {
+    	// ?
+    	return 0
+    }
+
+    type Spell struct {
+    	Name string
+    	Cost int
+    }
+
+    func main() {
+    	var chain Stack[Spell]
+    	chain.Push(Spell{Name: "fireball", Cost: 30})
+    	chain.Push(Spell{Name: "counterspell", Cost: 20})
+
+    	top, _ := chain.Peek()
+    	fmt.Println("on top:", top.Name)
+    	for chain.Len() > 0 {
+    		s, _ := chain.Pop()
+    		fmt.Println("resolve", s.Name)
+    	}
+    	_, ok := chain.Pop()
+    	fmt.Println("anything left?", ok)
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    // Stack is a last-in, first-out pile of values.
+    type Stack[T any] struct {
+    	items []T
+    }
+
+    func (s *Stack[T]) Push(v T) {
+    	s.items = append(s.items, v)
+    }
+
+    func (s *Stack[T]) Pop() (T, bool) {
+    	var zero T
+    	if len(s.items) == 0 {
+    		return zero, false
+    	}
+    	v := s.items[len(s.items)-1]
+    	s.items = s.items[:len(s.items)-1]
+    	return v, true
+    }
+
+    func (s *Stack[T]) Peek() (T, bool) {
+    	var zero T
+    	if len(s.items) == 0 {
+    		return zero, false
+    	}
+    	return s.items[len(s.items)-1], true
+    }
+
+    func (s *Stack[T]) Len() int { return len(s.items) }
+
+    type Spell struct {
+    	Name string
+    	Cost int
+    }
+
+    func main() {
+    	var chain Stack[Spell]
+    	chain.Push(Spell{Name: "fireball", Cost: 30})
+    	chain.Push(Spell{Name: "counterspell", Cost: 20})
+
+    	top, _ := chain.Peek()
+    	fmt.Println("on top:", top.Name)
+    	for chain.Len() > 0 {
+    		s, _ := chain.Pop()
+    		fmt.Println("resolve", s.Name)
+    	}
+    	_, ok := chain.Pop()
+    	fmt.Println("anything left?", ok)
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestStackOfStrings(t *testing.T) {
+    	var s Stack[string]
+    	if s.Len() != 0 {
+    		t.Fatalf("new stack: Len() = %d, want 0", s.Len())
+    	}
+    	if v, ok := s.Pop(); ok || v != "" {
+    		t.Errorf("Pop() on empty stack = (%q, %v), want (\"\", false)", v, ok)
+    	}
+    	if v, ok := s.Peek(); ok || v != "" {
+    		t.Errorf("Peek() on empty stack = (%q, %v), want (\"\", false)", v, ok)
+    	}
+    	s.Push("fireball")
+    	s.Push("counterspell")
+    	s.Push("shield")
+    	if s.Len() != 3 {
+    		t.Errorf("after 3 pushes: Len() = %d, want 3", s.Len())
+    	}
+    	if v, ok := s.Peek(); !ok || v != "shield" {
+    		t.Errorf("Peek() = (%q, %v), want (\"shield\", true)", v, ok)
+    	}
+    	if s.Len() != 3 {
+    		t.Errorf("Peek must not remove anything: Len() = %d, want 3", s.Len())
+    	}
+    	for _, want := range []string{"shield", "counterspell", "fireball"} {
+    		if v, ok := s.Pop(); !ok || v != want {
+    			t.Errorf("Pop() = (%q, %v), want (%q, true)", v, ok, want)
+    		}
+    	}
+    	if v, ok := s.Pop(); ok {
+    		t.Errorf("Pop() after emptying = (%q, true), want ok=false", v)
+    	}
+    	if s.Len() != 0 {
+    		t.Errorf("after popping everything: Len() = %d, want 0", s.Len())
+    	}
+    }
+
+    func TestStackOfInts(t *testing.T) {
+    	var s Stack[int]
+    	for i := range 5 {
+    		s.Push(i * 10)
+    	}
+    	if v, ok := s.Pop(); !ok || v != 40 {
+    		t.Errorf("Stack[int]: Pop() = (%d, %v), want (40, true)", v, ok)
+    	}
+    	s.Push(99)
+    	if v, _ := s.Peek(); v != 99 {
+    		t.Errorf("Stack[int]: Peek() after Push(99) = %d, want 99", v)
+    	}
+    	if s.Len() != 5 {
+    		t.Errorf("Stack[int]: Len() = %d, want 5", s.Len())
+    	}
+    }
 ---
 
 In the Go basics course you wrote generic *functions*, like a `Map` that works on any slice. Types can be generic too, and that matters for OOP, because it lets you write a reusable **container object** once and use it for heroes, items and dragons alike.
@@ -154,6 +321,12 @@ loot := Pair[string, int]{Key: "gold", Value: 250}
 ```
 
 The `comparable` constraint on `K` says "must support `==`". Constraints are the subject of the next lesson.
+
+## Your turn
+
+Some spells can be answered by other spells: a counterspell cast in response to a fireball resolves *first*. That's a **stack**, last in, first out.
+
+Complete the generic `Stack[T]`: `Push` adds to the top, `Pop` removes and returns the top value (or the zero value of `T` and `false` when empty), `Peek` returns the top without removing it, and `Len` reports the size. The tests use a `Stack[string]` and a `Stack[int]`, so don't assume anything about `T`.
 
 ## Further reading
 

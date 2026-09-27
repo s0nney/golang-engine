@@ -54,6 +54,66 @@ quiz:
       A variable declared in an `if`'s init statement is scoped to the whole
       `if` statement, including every `else if` and `else` branch. It
       disappears after the final `}`, so it isn't available at C.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // messageStatus describes how Textio will send a message of the given length.
+    func messageStatus(length int) string {
+    	// ?
+    	return ""
+    }
+
+    func main() {
+    	fmt.Println(messageStatus(0))
+    	fmt.Println(messageStatus(42))
+    	fmt.Println(messageStatus(300))
+    	fmt.Println(messageStatus(1000))
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func messageStatus(length int) string {
+    	if length <= 0 {
+    		return "empty"
+    	} else if length <= 160 {
+    		return "single"
+    	} else if length <= 480 {
+    		return "split"
+    	} else {
+    		return "too long"
+    	}
+    }
+
+    func main() {
+    	fmt.Println(messageStatus(0))
+    	fmt.Println(messageStatus(42))
+    	fmt.Println(messageStatus(300))
+    	fmt.Println(messageStatus(1000))
+    }
+  tests: |
+    package main
+
+    import "testing"
+
+    func TestMessageStatus(t *testing.T) {
+    	for _, tc := range []struct {
+    		length int
+    		want   string
+    	}{
+    		{0, "empty"}, {1, "single"}, {42, "single"}, {160, "single"},
+    		{161, "split"}, {300, "split"}, {480, "split"},
+    		{481, "too long"}, {1000, "too long"},
+    	} {
+    		if got := messageStatus(tc.length); got != tc.want {
+    			t.Errorf("messageStatus(%d) = %q, want %q", tc.length, got, tc.want)
+    		}
+    	}
+    }
 ---
 
 Now that you can ask yes-or-no questions, you can make your program **do different things** depending on the answer.
@@ -191,6 +251,21 @@ if err := send(msg); err != nil {
 ```
 
 Don't worry about those details yet. Just recognise the shape: *statement; condition*.
+
+## Your turn
+
+Complete `messageStatus` with an `if` / `else if` / `else` chain. For a message of
+`length` characters, return:
+
+| length | result |
+| --- | --- |
+| 0 | `"empty"` |
+| 1 to 160 | `"single"` |
+| 161 to 480 | `"split"` |
+| more than 480 | `"too long"` |
+
+Watch the edges: 160 is still `"single"` and 480 is still `"split"`. **Run** should
+print `empty`, `single`, `split` and `too long`.
 
 ## Further reading
 

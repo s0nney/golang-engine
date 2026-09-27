@@ -45,6 +45,105 @@ quiz:
       The standard library already has well-tested generic helpers such as
       `slices.Index`, `slices.ContainsFunc`, `slices.SortFunc` and
       `maps.Keys`. Reuse them rather than rewriting them.
+exercise:
+  starter: |
+    package main
+
+    import "fmt"
+
+    // groupBy puts items into groups, using key to pick each item's group.
+    // Items keep their original order within a group.
+    func groupBy(items []string, key func(string) string) map[string][]string {
+    	groups := make(map[string][]string)
+    	// ?
+    	return groups
+    }
+
+    type message struct {
+    	to   string
+    	body string
+    }
+
+    func main() {
+    	words := []string{"hi", "hey", "ok", "yes"}
+    	byFirst := groupBy(words, func(w string) string { return w[:1] })
+    	fmt.Println(byFirst["h"], byFirst["o"], byFirst["y"])
+
+    	// Once groupBy is generic, this should work too:
+    	// msgs := []message{{"alice", "hi"}, {"bob", "yo"}, {"alice", "bye"}}
+    	// byTo := groupBy(msgs, func(m message) string { return m.to })
+    	// fmt.Println(len(byTo["alice"]), byTo["bob"])
+    }
+  solution: |
+    package main
+
+    import "fmt"
+
+    func groupBy[T any, K comparable](items []T, key func(T) K) map[K][]T {
+    	groups := make(map[K][]T)
+    	for _, item := range items {
+    		k := key(item)
+    		groups[k] = append(groups[k], item)
+    	}
+    	return groups
+    }
+
+    type message struct {
+    	to   string
+    	body string
+    }
+
+    func main() {
+    	words := []string{"hi", "hey", "ok", "yes"}
+    	byFirst := groupBy(words, func(w string) string { return w[:1] })
+    	fmt.Println(byFirst["h"], byFirst["o"], byFirst["y"])
+
+    	msgs := []message{{"alice", "hi"}, {"bob", "yo"}, {"alice", "bye"}}
+    	byTo := groupBy(msgs, func(m message) string { return m.to })
+    	fmt.Println(len(byTo["alice"]), byTo["bob"])
+    }
+  tests: |
+    package main
+
+    import (
+    	"maps"
+    	"slices"
+    	"testing"
+    )
+
+    func TestGroupByStrings(t *testing.T) {
+    	words := []string{"hi", "hey", "ok", "yes"}
+    	got := groupBy(words, func(w string) string { return w[:1] })
+    	want := map[string][]string{"h": {"hi", "hey"}, "o": {"ok"}, "y": {"yes"}}
+    	if !maps.EqualFunc(got, want, slices.Equal) {
+    		t.Errorf("groupBy(%q, first letter) = %q, want %q", words, got, want)
+    	}
+    }
+
+    func TestGroupByStructs(t *testing.T) {
+    	msgs := []message{{"alice", "hi"}, {"bob", "yo"}, {"alice", "bye"}}
+    	got := groupBy(msgs, func(m message) string { return m.to })
+    	want := map[string][]message{"alice": {{"alice", "hi"}, {"alice", "bye"}}, "bob": {{"bob", "yo"}}}
+    	if !maps.EqualFunc(got, want, slices.Equal) {
+    		t.Errorf("groupBy(messages, by recipient) = %v, want %v", got, want)
+    	}
+    }
+
+    func TestGroupByIntKeys(t *testing.T) {
+    	bodies := []string{"a", "bb", "cc", "d", "eee"}
+    	got := groupBy(bodies, func(s string) int { return len(s) })
+    	want := map[int][]string{1: {"a", "d"}, 2: {"bb", "cc"}, 3: {"eee"}}
+    	if !maps.EqualFunc(got, want, slices.Equal) {
+    		t.Errorf("groupBy(%q, len) = %v, want %v", bodies, got, want)
+    	}
+    }
+
+    func TestGroupByEmpty(t *testing.T) {
+    	got := groupBy([]int{}, func(n int) bool { return n > 0 })
+    	if got == nil || len(got) != 0 {
+    		t.Errorf("groupBy(empty) = %v, want an empty, non-nil map", got)
+    	}
+    }
 ---
 
 Generics are at their most useful for working with **collections**. The `slices` and `maps` packages you've already used are written with generics. In this lesson you'll write a few helpers of your own, and see how they fit with the standard library.
@@ -179,6 +278,20 @@ Before writing a helper, check `slices` and `maps`. Many are already there, gene
 ## Don't overdo it
 
 Generics are a tool, not a goal. If a function only ever handles `[]message`, write it for `[]message`: it's simpler to read. Reach for type parameters when you actually have the same logic for several types. A good rule: write the concrete version first, and make it generic when you need the second copy.
+
+## Your turn
+
+`groupBy` only works for strings. Make it generic, then finish it:
+
+1. Give it two type parameters: `T any` for the items and `K comparable` for the
+   keys (map keys must be comparable). Its signature becomes
+   `func groupBy[T any, K comparable](items []T, key func(T) K) map[K][]T`.
+2. Loop over the items, work out each item's key, and append the item to that
+   key's slice, just like the maps-of-slices lesson.
+3. Uncomment the three lines at the end of `main`.
+
+**Submit** also groups messages by recipient and strings by length (an `int` key).
+**Run** should print `[hi hey] [ok] [yes]` and then `2 [{bob yo}]`.
 
 ## Further reading
 

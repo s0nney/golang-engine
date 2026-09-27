@@ -47,17 +47,18 @@ To always report them for one benchmark, call `b.ReportAllocs()` at the start of
 `Cents.String` is written as `fmt.Sprintf("%s$%d.%02d", sign, n/100, n%100)`. Two allocations per call:
 
 1. The **result string**. `Sprintf` has to return a new string, and it lives on the heap.
-2. **Boxing** an `int64` into the `...any` parameter. Putting a value in an interface may need a heap copy. (Go avoids it for small integers, which is why `n%100` doesn't count here but the `1234` dollars do.)
+2. **Boxing** a value into the `...any` parameter. Putting a value in an interface may need a heap copy. The runtime skips the copy for a few special cases, including integers below 256 and the empty string, which is why the `""` sign and the `56` cents are free here but the `1234` dollars cost an allocation.
 
 The compiler can tell you what escapes to the heap:
 
 ```text
 $ go build -gcflags=-m ./ledgerly
+./ledgerly.go:24:35: sign escapes to heap
 ./ledgerly.go:24:42: n / int64(100) escapes to heap
 ./ledgerly.go:24:49: n % int64(100) escapes to heap
 ```
 
-The "escapes" means the compiler couldn't prove the value stays on the stack. (It's a compile-time answer; the small-integer trick happens at run time.) `-gcflags=-m` output is noisy, so `grep` for the file you care about.
+The "escapes" means the compiler couldn't prove the value stays on the stack. (It's a compile-time answer. All three arguments "escape", and the run-time special cases then decide which of them really allocate.) `-gcflags=-m` output is noisy, so `grep` for the file you care about.
 
 ## The append pattern
 

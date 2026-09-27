@@ -336,10 +336,10 @@ After `wg.Wait()`, every write is visible to the caller.
 
 ## Stopping early
 
-To make a pool cancellable, add a `ctx`: the sending loop selects on `ctx.Done()` so it stops handing out jobs, and each worker checks `ctx.Err()` before starting a job. The error group at the end of this chapter builds on exactly that.
+To make a pool cancellable, add a `ctx`: the sending loop selects on `ctx.Done()` so it stops handing out jobs, and each worker checks `ctx.Err()` before starting a job. The error group in the next chapter builds on exactly that.
 
 ## Your turn
 
 Dispatchly's payment provider allows at most a few concurrent charges per merchant account. `processAll` must charge every order using **at most `workers` concurrent calls** to `process`, and return the receipts **in the same order** as `orders`.
 
-The starter starts one goroutine per order. Press **Run** and look at the peak. Rewrite `processAll` as a worker pool. The tests check the peak concurrency, the order of the receipts, and that the work really runs in parallel: with 10 orders, 3 workers and 1 second per charge, it should take 4 seconds, not 10.
+The starter starts one goroutine per order. Press **Run** and look at the peak. Rewrite `processAll` as a worker pool. The tests check the peak concurrency, the order of the receipts, and that the work really runs in parallel: with 10 orders, 3 workers and 1 second per charge, it should take 4 seconds, not 10. (The tests use `synctest`'s fake clock, so they run instantly.)

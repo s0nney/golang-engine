@@ -120,7 +120,7 @@ It differs from `NewServer` in three useful ways:
 3. It's tied to `t`: it **closes itself** when the test ends, and it fails the test
    if the handler panics.
 
-It also runs inside `testing/synctest` bubbles, which lesson 5 relies on.
+It also runs inside `testing/synctest` bubbles, which lesson 4 relies on.
 
 `NewServer` is still fine, especially when something outside your Go test (a
 subprocess, a browser) has to reach the server over a real port.

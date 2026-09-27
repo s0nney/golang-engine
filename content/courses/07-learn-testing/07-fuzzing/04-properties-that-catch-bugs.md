@@ -433,6 +433,6 @@ Use the `parse` argument, not `ParseAmount` directly. That's how the grader chec
 Once your properties work, the seed corpus will show that the real `ParseAmount` breaks them:
 
 - **Signs in the wrong place.** `strconv.ParseInt` accepts a leading `+`, so `"+0"`, `"+12.50"`, `"1.+5"` and `"-+5"` are all accepted. Check that the dollars and the cents contain only the digits 0 to 9 before parsing them.
-- **Overflow.** `d*100 + c` silently wraps round for huge amounts. Return an error wrapping `ErrBadAmount` if the result wouldn't fit. The largest allowed amount is `92233720368547758.07`, which is `math.MaxInt64` cents; `d > (math.MaxInt64-c)/100` tells you it won't fit, and you'll need to import `math`.
+- **Overflow.** `d*100 + c` silently wraps round for huge amounts. Return an error wrapping `ErrBadAmount` if the result wouldn't fit. Ledgerly allows amounts from `-92233720368547758.07` to `92233720368547758.07` (`math.MaxInt64` cents), so every valid amount can be negated safely; `-92233720368547758.08` must be rejected too, even though `math.MinInt64` would hold it. The check `d > (math.MaxInt64-c)/100` (on the magnitude, before applying the sign) tells you it's out of range, and you'll need to import `math`.
 
 **Run** parses a few interesting inputs and shows what your `checkParseAmount` reports for each against the current `ParseAmount`. Before you fix anything, your check should complain about `"+0"`, `"1.+5"` and the overflows. After the fix, it should be silent.

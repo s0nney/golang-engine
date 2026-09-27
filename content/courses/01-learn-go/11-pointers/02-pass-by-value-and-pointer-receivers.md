@@ -13,7 +13,7 @@ quiz:
       	credits int
       }
 
-      func (a account) addValue(n int) { a.credits += n }
+      func (a account) addValue(n int)    { a.credits += n }
       func (a *account) addPointer(n int) { a.credits += n }
 
       func main() {

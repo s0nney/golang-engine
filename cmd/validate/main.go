@@ -48,8 +48,13 @@ func main() {
 				}
 			}
 		}
-		fmt.Printf("%-40s %2d chapters %3d lessons %3d questions %3d exercises\n",
-			c.Title, len(c.Chapters), lessons, questions, exercises)
+		levels := make(map[string]int)
+		for _, p := range c.Problems {
+			levels[p.Difficulty]++
+		}
+		fmt.Printf("%-40s %2d chapters %3d lessons %3d questions %3d exercises %3d problems (%d/%d/%d)\n",
+			c.Title, len(c.Chapters), lessons, questions, exercises,
+			len(c.Problems), levels["easy"], levels["medium"], levels["hard"])
 	}
 	if *execute {
 		err = errors.Join(err, checkExercises(courses))
@@ -76,28 +81,37 @@ func checkExercises(courses []course.Course) error {
 		errs = append(errs, fmt.Errorf(format, args...))
 	}
 	ctx := context.Background()
+	type named struct {
+		name string
+		e    *course.Exercise
+	}
+	var all []named
 	for _, c := range courses {
 		for _, ch := range c.Chapters {
 			for _, l := range ch.Lessons {
-				e := l.Exercise
-				if e == nil {
-					continue
+				if l.Exercise != nil {
+					all = append(all, named{c.Slug + "/" + ch.Slug + "/" + l.Slug, l.Exercise})
 				}
-				name := c.Slug + "/" + ch.Slug + "/" + l.Slug
-				wg.Go(func() {
-					if res, ok := run.Submit(ctx, e.Solution, e.Tests, e.ExpectedOutput); !ok {
-						fail("%s: solution doesn't pass:\n%s", name, res.Output)
-					}
-					if res := run.Check(ctx, e.Starter); !res.OK {
-						fail("%s: starter doesn't compile:\n%s", name, res.Output)
-						return
-					}
-					if _, ok := run.Submit(ctx, e.Starter, e.Tests, e.ExpectedOutput); ok {
-						fail("%s: starter code already passes", name)
-					}
-				})
 			}
 		}
+		for _, p := range c.Problems {
+			all = append(all, named{c.Slug + "/exercises/" + p.Slug, p.Exercise})
+		}
+	}
+	for _, x := range all {
+		name, e := x.name, x.e
+		wg.Go(func() {
+			if res, ok := run.Submit(ctx, e.Solution, e.Tests, e.ExpectedOutput); !ok {
+				fail("%s: solution doesn't pass:\n%s", name, res.Output)
+			}
+			if res := run.Check(ctx, e.Starter); !res.OK {
+				fail("%s: starter doesn't compile:\n%s", name, res.Output)
+				return
+			}
+			if _, ok := run.Submit(ctx, e.Starter, e.Tests, e.ExpectedOutput); ok {
+				fail("%s: starter code already passes", name)
+			}
+		})
 	}
 	wg.Wait()
 	return errors.Join(errs...)

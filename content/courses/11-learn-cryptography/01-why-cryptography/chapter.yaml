@@ -1,0 +1,2 @@
+title: Why Cryptography
+description: What cryptography can and can't promise, who you're defending against, why the key must be the only secret, and a tour of Go's crypto toolbox, including FIPS 140-3 mode.

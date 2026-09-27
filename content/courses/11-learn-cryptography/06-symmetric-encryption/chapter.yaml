@@ -1,0 +1,2 @@
+title: Symmetric Encryption
+description: Block ciphers, why ECB leaks patterns, why modern encryption is always authenticated, AES-GCM in Go, nonces and the cost of reusing one, associated data, and encrypting Keybox's vault at rest.

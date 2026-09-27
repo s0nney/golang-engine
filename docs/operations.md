@@ -32,7 +32,7 @@ the browser's cookie while writing to different databases.
 ## Startup, updates and shutdown
 
 On startup the loader reports invalid content and skips it. The server exits if no
-courses are usable. A successful listen alone does not establish that all nine courses
+courses are usable. A successful listen alone does not establish that all eleven courses
 loaded: validate the source and inspect the startup log's course count.
 
 Every startup replaces the content tables in a transaction. Progress and activity
